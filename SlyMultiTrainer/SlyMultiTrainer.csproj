@@ -68,6 +68,9 @@
     <Content Include="..\SlyMultiTrainer-Changelog.txt">
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </Content>
+    <Content Include="..\LICENSE.txt">
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
     <Content Include="Img\icon_1_256x256.ico" />
   </ItemGroup>
 

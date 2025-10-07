@@ -38,6 +38,11 @@ namespace SlyMultiTrainer
                 var version = Assembly.GetExecutingAssembly()
                               .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                               ?.InformationalVersion;
+                if (version!.Contains('+'))
+                {
+                    version = version!.Split('+')[0];
+                }
+
                 _formTitle = $"Sly Multi Trainer (v{version})";
                 bgWorkerMain.RunWorkerAsync();
             }
