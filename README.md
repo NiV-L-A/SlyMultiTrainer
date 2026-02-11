@@ -1,17 +1,34 @@
-# Sly Multi Trainer
+# <img src="SlyMultiTrainer/Img/SlyMultiTrainer_Icon.png" width="48" height="auto"> Sly Multi Trainer
 
-[Video showcase](https://www.youtube.com/watch?v=nfF_uditjxA) <br>
-[![](https://img.youtube.com/vi/nfF_uditjxA/0.jpg)](https://www.youtube.com/watch?v=nfF_uditjxA)
+<img src="SlyMultiTrainer/Img/SlyMultiTrainer_Logo.png" width="512" height="auto">
 
-<img src="SlyMultiTrainer/Img/Sly1_Main.png">
-<img src="SlyMultiTrainer/Img/Sly2_Main.png">
-<img src="SlyMultiTrainer/Img/Sly3_Main.png">
+## 📖 Description
+Sly Multi Trainer is a trainer for the Sly Cooper original trilogy principally developed by [NiV-L-A](https://github.com/NiV-L-A). It supports the [PCSX2](https://pcsx2.net/) and [RPCS3](https://rpcs3.net/) emulators.
 
-## Description
-Sly Multi Trainer is a trainer for the Sly Cooper games. It supports the PCSX2 and RPCS3 emulators. <br>
-Please, refer to the [Changelog](/SlyMultiTrainer-Changelog.txt) file for information about changes for each version.
+With Sly Multi Trainer, you can experiment with the internal parameters of the Sly Cooper trilogy, understand how things work under the hood, study the games’ inner mechanics, or simply have fun forcing behaviors that would be impossible in the original game without an external tool.
 
-Supported builds:
+Please, refer to the [Changelog](https://raw.githubusercontent.com/NiV-L-A/SlyMultiTrainer/refs/heads/master/SlyMultiTrainer-Changelog.txt) for information about changes for each version.
+
+>[Download now](https://github.com/NiV-L-A/SlyMultiTrainer/releases/latest)
+
+### 📹 Video showcase
+>https://www.youtube.com/watch?v=nfF_uditjxA
+
+<a href="https://www.youtube.com/watch?v=nfF_uditjxA"><img src="https://i.ytimg.com/vi/nfF_uditjxA/maxresdefault.jpg" width="256" height="auto"></a>
+
+## 📸 Screenshots
+
+### Sly Multi Trainer with Sly Cooper and the Thievius Raccoonus / Sly Raccoon
+<img src="SlyMultiTrainer/Img/Sly1_Main.png" width="512" height="auto"> 
+
+### Sly Multi Trainer with Sly 2: Band of Thieves
+<img src="SlyMultiTrainer/Img/Sly2_Main.png" width="512" height="auto"> 
+
+### Sly Multi Trainer with Sly 3: Honor Among Thieves
+<img src="SlyMultiTrainer/Img/Sly3_Main.png" width="512" height="auto"> 
+
+
+## ⚙️ Supported builds
 |         Game          |                 Region                  | Short-format build date |   Serial   |   CRC    |
 | :-------------------: | :-------------------------------------: | :---------------------: | :--------: | :------: |
 |         Sly 1         |                  NTSC                   |        0824.2206        | SCUS-97198 | C77AF2CA |
@@ -43,32 +60,32 @@ Supported builds:
 |         Sly 3         |              NTSC July 16               |        0716.1854        | SCUS-97464 | 0190CF8B |
 |         Sly 3         |              PAL August 2               |        0802.0136        | SCES-52529 | 8C146034 |
 |         Sly 3         |             PAL September 2             |        0902.1747        | SCES-53409 | 3670B6F9 |
-|         Sly 1         |             NTSC (PS3 PSN)              |        0906.1415        | NPUA80663  |          |
-|         Sly 1         |              PAL (PS3 PSN)              |        1103.1309        | NPEA00341  |          |
-|         Sly 1         |            NTSC-K (PS3 PSN)             |        1129.1638        | NPHA80174  |          |
-|         Sly 2         |             NTSC (PS3 PSN)              |        0524.2241        | NPUA80664  |          |
-|         Sly 2         |              PAL (PS3 PSN)              |        0524.2241        | NPEA00342  |          |
-|         Sly 2         |            NTSC-K (PS3 PSN)             |        0524.2241        | NPHA80175  |          |
-|         Sly 3         |             NTSC (PS3 PSN)              |        1222.1218        | NPUA80665  |          |
-|         Sly 3         |              PAL (PS3 PSN)              |        1222.1218        | NPEA00343  |          |
-|         Sly 3         |            NTSC-K (PS3 PSN)             |        1222.1218        | NPHA80176  |          |
-|  The Sly Collection   |                  NTSC                   |                         | BCUS98246  |          |
-|    The Sly Trilogy    |                   PAL                   |                         | BCES00968  |          |
-|    The Sly Trilogy    |                   UK                    |                         | BCES00982  |          |
-| Sly Cooper Collection |                 NTSC-J                  |                         | BCJS30061  |          |
+|         Sly 1         |             NTSC (PS3 PSN)              |        0906.1415        | NPUA80663  |      -    |
+|         Sly 1         |              PAL (PS3 PSN)              |        1103.1309        | NPEA00341  |      -    |
+|         Sly 1         |            NTSC-K (PS3 PSN)             |        1129.1638        | NPHA80174  |      -    |
+|         Sly 2         |             NTSC (PS3 PSN)              |        0524.2241        | NPUA80664  |      -    |
+|         Sly 2         |              PAL (PS3 PSN)              |        0524.2241        | NPEA00342  |      -    |
+|         Sly 2         |            NTSC-K (PS3 PSN)             |        0524.2241        | NPHA80175  |      -    |
+|         Sly 3         |             NTSC (PS3 PSN)              |        1222.1218        | NPUA80665  |      -    |
+|         Sly 3         |              PAL (PS3 PSN)              |        1222.1218        | NPEA00343  |      -    |
+|         Sly 3         |            NTSC-K (PS3 PSN)             |        1222.1218        | NPHA80176  |      -    |
+|  The Sly Collection   |                  NTSC                   |             -            | BCUS98246  |      -    |
+|    The Sly Trilogy    |                   PAL                   |             -            | BCES00968  |      -    |
+|    The Sly Trilogy    |                   UK                    |             -            | BCES00982  |      -    |
+| Sly Cooper Collection |                 NTSC-J                  |             -            | BCJS30061  |      -    |
 
-## How to run / Troubleshooting
-**IMPORTANT:** *.NET Desktop Runtime 10.0 x64* must be installed in order to run this program.<br>
-https://dotnet.microsoft.com/en-us/download/dotnet/10.0
+## 🚀 How to run and use
+>[!IMPORTANT]
+> *[.NET Desktop Runtime 10.0 x64](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)* must be installed in order to run this program.<br>
 
-- ***The application may need to be ran as administrator***
-- The application automatically detects the PCSX2/RPCS3 process and the game build
-- A combobox is available to target a specific valid process if more than one is detected
-- Controls appear and disappear depending on the build that is being detected
-  - For example, for all Sly 1 builds a "Lucky charms" combobox is present, but it is not present for all Sly 2 and Sly 3 builds
-  - This also applies to builds of the same game: for example, a checkbox control is present for the build `Sly 2 NTSC` which toggles the guards AI but it is not present for `Sly 2 NTSC E3 Demo` <br/>
+- The program ***may need to be ran as administrator***.
+- The program automatically detects the PCSX2/RPCS3 process and the game build.
+- A combobox is available to target a specific valid process if more than one is detected.
+- Program options change depending on the detected build.
+  - For example, for all Sly 1 builds a "Lucky charms" combobox is present, but it is not present for all Sly 2 and Sly 3 builds.
+  - This also applies to builds of the same game: for example, a checkbox control is present for the build `Sly 2 NTSC` which toggles the guards AI but it is not present for `Sly 2 NTSC E3 Demo`.
 
-## Features
+## 📚 Features
 - Load maps
 - Warp to pre-defined locations
 - Edit coins
@@ -102,7 +119,9 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
 - A button to re-initialize the application. This has the same effect as closing and opening the application
 - A button to modify some of the application's settings and behavior
 - Sly 1: World states tab
-  <img src="SlyMultiTrainer/Img/Sly1_World.png">
+  
+  <img src="SlyMultiTrainer/Img/Sly1_World.png" width="512" height="auto">
+  
   - 5 sub-tabs for each world
   - Edit each world's "Started", "1 key collected", "3 keys collected" and "7 keys collected" flags
   - Edit each world's "Keys collected", "Safes opened" and "Sprints completed" values
@@ -124,8 +143,10 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
     - Edit "Burning Rubber - Computer"
     - Edit "Bentley Comes Through - Chip"
 - Sly 2 & 3: FK$X objects viewer tab
-  <img src="SlyMultiTrainer/Img/Sly2_Entities.png">
-  <img src="SlyMultiTrainer/Img/Sly3_Entities.png">
+  
+  <img src="SlyMultiTrainer/Img/Sly2_Entities.png" width="512" height="auto">
+  <img src="SlyMultiTrainer/Img/Sly3_Entities.png" width="512" height="auto">
+  
   - Populated on map change
   - "Refresh" button to force reading the game's memory again to parse the FK$X objects list
   - Search bar to filter through the list
@@ -136,10 +157,12 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
     - Show world (final) position
     - Warp the active character to the selected entity
 - Sly 2 & 3: Interactive DAG viewer tab
-  <img src="SlyMultiTrainer/Img/Sly2_DAG_1.png">
-  <img src="SlyMultiTrainer/Img/Sly2_DAG_2.png">
-  <img src="SlyMultiTrainer/Img/Sly3_DAG_1.png">
-  <img src="SlyMultiTrainer/Img/Sly3_DAG_2.png">
+  
+  <img src="SlyMultiTrainer/Img/Sly2_DAG_1.png" width="512" height="auto">
+  <img src="SlyMultiTrainer/Img/Sly2_DAG_2.png" width="512" height="auto">
+  <img src="SlyMultiTrainer/Img/Sly3_DAG_1.png" width="512" height="auto">
+  <img src="SlyMultiTrainer/Img/Sly3_DAG_2.png" width="512" height="auto">
+  
   - Populated on map change
   - Might take some moments to show
   - Mouse wheel to zoom-in and zoom-out
@@ -212,8 +235,10 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
   - Double left click on a job
     - Load job (with Shift pressed: Load job with zero focus)
 - Sly 2 & 3: Strings tab
-  <img src="SlyMultiTrainer/Img/Sly2_Strings_Localized.png">
-  <img src="SlyMultiTrainer/Img/Sly3_Strings_Savefile.png">
+  
+  <img src="SlyMultiTrainer/Img/Sly2_Strings_Localized.png" width="512" height="auto">
+  <img src="SlyMultiTrainer/Img/Sly3_Strings_Savefile.png" width="512" height="auto">
+  
   - A tab that contains 2 sub-tabs:
     - "Localized" tab:
       - Populated on map change
@@ -227,7 +252,7 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
   - Credits
   - Addresses list used for the current build
 
-## TO-DO
+## 📒 Planned features
 - General
   - Custom warps
   - Dark mode
@@ -275,7 +300,7 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
   - For Sly 2, the option "Load to this entrance location" could actually be warping without reloading. The entrance value of a checkpoint is the id (the field at +0x18) of an entrance struct. For Sly 2 NTSC, the first entrance struct is pointed at by the address 0x3E06C0 (calculated from 3DD490 + 3038 + 2A * C). <br>
     Function stack: address 0x3E06C0 calculated by the function at 15E3A8 called from 15EB74. Instruction at 15EBB8 stores to the stack an array of entrance struct pointers, which was requested by the instruction at address 22803C. The rest of the function goes through the array of entrance structs and checks if the field at +0x18 is the same as the requested entrance value. When found, the transformation matrix is at +0x60
 
-## Known issues
+## 😬 Known issues
 - Sly 3 NTSC Regular Demo
   - Gadget binds for L2 and R2 don't work
 - DAG
@@ -294,7 +319,7 @@ https://dotnet.microsoft.com/en-us/download/dotnet/10.0
     - PAL August 2:
       - Loading some checkpoints forces the game to load with 3D screen enabled
 
-## Build instructions
+## 🛠️ Build instructions
 Sly Multi Trainer uses a [modified version of memory.dll](https://github.com/NiV-L-A/memory.dll) to facilitate the development of the program.<br>
 The modifications add additional data types for read and write operations and a custom way to deal with addresses, offsets and pointers.
 
@@ -307,21 +332,28 @@ The modifications add additional data types for read and write operations and a 
 7. On the left side select "Projects", add the "Memory" item and make sure its checkbox is checked. Click OK
 8. Visual Studio should recognize the file and the project should accept the "Memory" namespace
 9. Run the application by clicking on "Debug" and then "Start Debugging"
-  - Do note that debug symbols are not emitted when in "Release" mode. To actually debug the application (e.g. set breakpoints) make sure to be in "Debug" mode
 
-## Release workflow
+>[!NOTE]
+>Do note that debug symbols are not emitted when in "Release" mode. To actually debug the application (e.g. set breakpoints) make sure to be in "Debug" mode
+
+## 🛩️ Release workflow
 1. In the Solution Explorer window, right click on the SlyMultiTrainer project entry, go to "Properties", "Package" and increase the "Package Version"
 2. Run the application and make sure the window's title reflects the new package version
 3. Remove unused using directives
 4. Change changelog
 5. In the Solution Explorer window, right click on the SlyMultiTrainer project entry and select "Publish". Use the following settings and then click "Publish":
-<img src="SlyMultiTrainer/Img/publish_settings.png">
+<img src="SlyMultiTrainer/Img/publish_settings.png" width="384" height="auto">
 
-## Credits
-- NiV-L-A
-- TheOnlyZac
-- fr4nk0
-- SlyCooperReloadCoded
+## 📜 Credits & Thanks
+- [NiV-L-A](https://github.com/NiV-L-A)
+- [TheOnlyZac](https://github.com/TheOnlyZac)
+- [fr4nk0](https://github.com/fr4nk014)
+- [SlyCooperReloadCoded](https://github.com/SlyCooperReloadCoded)
+- [Néo Foderé de Frutos](https://github.com/neofodere)
 - Sly Cooper Modding Discord Server: https://discord.gg/2GSXcEzPJA
 - memory.dll: https://github.com/NiV-L-A/memory.dll
 - Microsoft Automatic Graph Layout: https://github.com/microsoft/automatic-graph-layout
+
+<hr>
+
+**Sly Multi Trainer is a fan project and is not affiliated with, endorsed by, or in any way connected to Sucker Punch Productions, PlayStation Studios or Sony**
