@@ -7,44 +7,51 @@ namespace SlyMultiTrainer
 {
     public class Sly3Handler : GameBase_t
     {
+        private Memory.Mem _m;
+        private Form1 _form;
+        private Encoding _encoding;
+
         public string ReloadAddress = "";
         public string ReloadValuesAddress = "";
-        public string FKXListCount = "";
+        public string FKXListCountAddress = "";
         public string CameraPointer = "";
-        public string DeathBarriersAddress = "";
         public string ActiveCharacterPointer = "";
         public string ActiveCharacterIdAddress = "";
         public string StringTableCountAddress = "";
         public string IsLoadingAddress = "";
+        public string EntranceRootNodePointer = "";
         public DAG_t DAG;
         public Sly2_3_Savefile Savefile;
 
         private string _offsetTransformationOrigin = "44";
         private string _offsetTransformationLocal = "";
         private string _offsetTransformationWorld = "";
+        private string _offsetTransformationFinal = "";
+        private string _offsetCollision = "DC";
+        private string _offsetInvulnerable = "100";
+        private string _offsetRadTarget = "1BC";
         private string _offsetHealth = "16C";
         private string _offsetGadgetPower = "174";
-        private string _offsetController = "134";
-        private string _offsetControllerBinds = "18";
+        private string _offsetDeltaTranslation = "250";
         private string _offsetInfiniteDbJump = "33C";
         private string _offsetSpeedMultiplier = "354";
-        private string _offsetInvulnerable = "180";
         private string _offsetGadgetBinds = "1250";
-        private string _offsetUndetectable = "1160";
+        private string _offsetUndetectable = "1280";
+        private string _offsetEntranceTransformation = "50";
+        private string _offsetCurrentDialogue = "60";
+        private string _offsetDialogueFlags = "5C";
+        private int _lastInvulnerableValue = 0;
 
-        private Memory.Mem _m;
-        private Encoding _encoding;
-
-        public Sly3Handler(Memory.Mem m, Form1 form, string region) : base(m, form, region)
+        public Sly3Handler(Form1 form, Memory.Mem m, Build_t build) : base(form, m, build)
         {
             _m = m;
+            _form = form;
             DAG = new(m);
             DAG.SetVersion(DAG_VERSION.V3);
             Savefile = new(m);
             Savefile.SetVersion(SAVEFILE_VERSION.V1);
             _encoding = Encoding.Unicode;
 
-            DAG.OffsetNextNodePointer = "20";
             DAG.OffsetState = "44";
             DAG.OffsetGoalDescription = "4C";
             DAG.OffsetFocusCount = "54";
@@ -56,15 +63,17 @@ namespace SlyMultiTrainer
             DAG.OffsetCheckpointEntranceValue = "A8";
             DAG.OffsetAttributes = "D0";
             DAG.OffsetAttributesForCluster = "D0";
+            DAG.OffsetVerticalLayer = "108";
             DAG.GetStringFromId = GetStringFromId;
             DAG.LoadMap = LoadMap;
             DAG.WriteActCharId = WriteActCharId;
 
-            if (region == "NTSC")
+            if (build.Region == Util.BuildRegions[BUILD_NAME.NTSC])
             {
+                // SCUS-97464 - 8BC95883
                 ReloadAddress = "4797C4";
                 ReloadValuesAddress = "2EDFD8";
-                FKXListCount = "479AAC";
+                FKXListCountAddress = "479AAC";
                 ClockAddress = "36BBA0";
                 CoinsAddress = "468DDC";
                 GadgetAddress = "468DCC";
@@ -72,27 +81,32 @@ namespace SlyMultiTrainer
                 DrawDistanceAddress = $"{CameraPointer},114";
                 FOVAddress = $"{CameraPointer},11C";
                 ResetCameraAddress = $"{CameraPointer},2F4";
+                CanCameraNoclipAddress = "349FA0";
                 MapIdAddress = "47989C";
-                DeathBarriersAddress = "478BF4,2C";
                 GuardAIAddress = "370A8C";
                 ActiveCharacterPointer = "36F84C";
                 ActiveCharacterIdAddress = "36C710";
+                StringTableCountAddress = "47A2D4";
+                IsLoadingAddress = "467B00";
+                EntranceRootNodePointer = "478680";
                 DAG.RootNodePointer = "478C8C";
                 DAG.CurrentCheckpointNodePointer = "4794CC";
                 DAG.ClusterIdAddress = "36DB98";
-                Savefile.SavefileStartAddress = "468D30";
-                Savefile.SavefileKeyAddressTablePointer = "4793CC";
-                Savefile.SavefileKeyStringTablePointer = "4794A8";
                 DAG.Sly3Time = "36BC20";
                 DAG.Sly3Flag = "479754";
-                StringTableCountAddress = "47A2D4";
-                IsLoadingAddress = "467B00";
+                Savefile.SavefileStartAddress = "468D30";
+                Savefile.SavefileAddressTablePointer = "4793CC";
+                Savefile.SavefileStringTablePointer = "4794A8";
+                ControllerAddress = "36E758";
+                DialoguePointer = "475200";
+                SkipFMVPointer = "389C18";
             }
-            else if (region == "PAL")
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.PAL])
             {
+                // SCES-53409 - 8164C614
                 ReloadAddress = "47AE44";
                 ReloadValuesAddress = "2EE658";
-                FKXListCount = "47B12C";
+                FKXListCountAddress = "47B12C";
                 ClockAddress = "36C620";
                 CoinsAddress = "46A45C";
                 GadgetAddress = "46A44C";
@@ -100,27 +114,32 @@ namespace SlyMultiTrainer
                 DrawDistanceAddress = $"{CameraPointer},114";
                 FOVAddress = $"{CameraPointer},11C";
                 ResetCameraAddress = $"{CameraPointer},2F4";
+                CanCameraNoclipAddress = "34AA20";
                 MapIdAddress = "47AF1C";
-                DeathBarriersAddress = "47A274,2C";
                 GuardAIAddress = "37150C";
                 ActiveCharacterPointer = "3702CC";
                 ActiveCharacterIdAddress = "36D190";
+                StringTableCountAddress = "47B954";
+                IsLoadingAddress = "469180";
+                EntranceRootNodePointer = "479D00";
                 DAG.RootNodePointer = "47A30C";
                 DAG.CurrentCheckpointNodePointer = "47AB4C";
                 DAG.ClusterIdAddress = "36E618";
-                Savefile.SavefileStartAddress = "46A3B0";
-                Savefile.SavefileKeyAddressTablePointer = "47AA4C";
-                Savefile.SavefileKeyStringTablePointer = "47AB28";
                 DAG.Sly3Time = "36C6A0";
                 DAG.Sly3Flag = "47ADD4";
-                StringTableCountAddress = "47B954";
-                IsLoadingAddress = "469180";
+                Savefile.SavefileStartAddress = "46A3B0";
+                Savefile.SavefileAddressTablePointer = "47AA4C";
+                Savefile.SavefileStringTablePointer = "47AB28";
+                ControllerAddress = "36F1D8";
+                DialoguePointer = "476880";
+                SkipFMVPointer = "38AA98";
             }
-            else if (region == "NTSC-K")
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCK])
             {
+                // SCKA-20063 - A8CC1583
                 ReloadAddress = "47B8C4";
                 ReloadValuesAddress = "2EEF58";
-                FKXListCount = "47BBAC";
+                FKXListCountAddress = "47BBAC";
                 ClockAddress = "36D0A0";
                 CoinsAddress = "46AEDC";
                 GadgetAddress = "46AECC";
@@ -128,141 +147,34 @@ namespace SlyMultiTrainer
                 DrawDistanceAddress = $"{CameraPointer},114";
                 FOVAddress = $"{CameraPointer},11C";
                 ResetCameraAddress = $"{CameraPointer},2F4";
+                CanCameraNoclipAddress = "34B4A0";
                 MapIdAddress = "47B99C";
-                DeathBarriersAddress = "47ACF4,2C";
                 GuardAIAddress = "371F8C";
                 ActiveCharacterPointer = "370D4C";
                 ActiveCharacterIdAddress = "36DC10";
+                StringTableCountAddress = "47C3D4";
+                IsLoadingAddress = "469C00";
+                EntranceRootNodePointer = "47A780";
                 DAG.RootNodePointer = "47AD8C";
                 DAG.CurrentCheckpointNodePointer = "47B5CC";
                 DAG.ClusterIdAddress = "36F098";
-                Savefile.SavefileStartAddress = "46AE30";
-                Savefile.SavefileKeyAddressTablePointer = "47B4CC";
-                Savefile.SavefileKeyStringTablePointer = "47B5A8";
                 DAG.Sly3Time = "36D120";
                 DAG.Sly3Flag = "47B854";
-                StringTableCountAddress = "47C3D4";
-                IsLoadingAddress = "469C00";
+                Savefile.SavefileStartAddress = "46AE30";
+                Savefile.SavefileAddressTablePointer = "47B4CC";
+                Savefile.SavefileStringTablePointer = "47B5A8";
+                ControllerAddress = "36FC58";
+                DialoguePointer = "477300";
+                SkipFMVPointer = "38B518";
             }
-            else if (region == "NTSC July 16")
-            {
-                _offsetUndetectable = "1180";
-                _offsetSpeedMultiplier = "358";
-                _offsetInfiniteDbJump = "348";
-                _offsetGadgetBinds = "1270";
-
-                ReloadAddress = "46BB24";
-                ReloadValuesAddress = "2DEB08";
-                FKXListCount = "46BE0C";
-                ClockAddress = "35F6A0";
-                CoinsAddress = "45B0A8";
-                GadgetAddress = "45B09C";
-                CameraPointer = "46B5AC";
-                DrawDistanceAddress = $"{CameraPointer},114";
-                FOVAddress = $"{CameraPointer},11C";
-                ResetCameraAddress = $"{CameraPointer},324";
-                MapIdAddress = "46BBFC";
-                DeathBarriersAddress = "46AE74,2C";
-                GuardAIAddress = "362F1C";
-                ActiveCharacterPointer = "361D5C";
-                ActiveCharacterIdAddress = "45AFC4";
-                DAG.RootNodePointer = "46AEF4";
-                DAG.CurrentCheckpointNodePointer = "46B738";
-                DAG.ClusterIdAddress = "3600D0";
-                Savefile.SavefileStartAddress = "45AFB0";
-                Savefile.SavefileKeyAddressTablePointer = "46B63C";
-                Savefile.SavefileKeyStringTablePointer = "46B718";
-                DAG.Sly3Time = "35F720";
-                DAG.Sly3Flag = "46BAC8";
-                StringTableCountAddress = "46C624";
-                IsLoadingAddress = "459D80";
-
-                for (int i = 23; i < 35; i++)
-                {
-                    Maps[i].IsVisible = false;
-                }
-
-                Maps.RemoveRange(36, 4);
-
-                Gadgets = new()
-                {
-                    new()
-                    {
-                        new("Smoke Bomb", 0x1A),
-                        new("Combat Dodge", 0x1B),
-                        new("Feral Pounce", 0x1E),
-                        new("Mega Jump", 0x1F),
-                        new("Knockout Dive", 0x20),
-                        new("Unknown Rocket Boots", 0x21),
-                        new("Shadow Power Level 1", 0x22),
-                        new("Thief Reflexes", 0x23),
-                        new("Shadow Power Level 2", 0x24),
-                        new("Rocket Boots", 0x25),
-                        new("Treasure Map", 0x26),
-                        new("Shield", 0x27),
-                        new("Venice Disguise", 0x28),
-                        new("Photographer Disguise", 0x29),
-                        new("Pirate Disguise", 0x2A),
-                    },
-
-                    new()
-                    {
-                        new("Trigger Bomb", 0x6),
-                        new("Fishing Pole", 0x7),
-                        new("Alarm Clock", 0x8),
-                        new("Adrenaline Burst", 0x9),
-                        new("Health Extractor", 0xA),
-                        new("Insanity Strike", 0xC),
-                        new("WebCam Bomb", 0xD),
-                        new("Size Destabilizer", 0xE),
-                        new("Rage Bomb", 0xF),
-                        new("Reduction Bomb", 0x10),
-                    },
-
-                    new()
-                    {
-                        new("Be The Ball", 0x11),
-                        new("Berserker Charge", 0x12),
-                        new("Guttural Roar", 0x14),
-                        new("Fists of Flame", 0x15),
-                        new("Temporal Lock", 0x16),
-                        new("Raging Inferno Flop", 0x17),
-                        new("Diablo Fire Slam", 0x18),
-                        new("Cutscene Puppet", 0x19),
-                    }
-                };
-            }
-            else if (region == "NTSC E3 Demo")
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCDemoApril18])
             {
                 DAG.SetVersion(DAG_VERSION.V2);
+                _offsetDeltaTranslation = "240";
                 _offsetSpeedMultiplier = "328";
                 _offsetInfiniteDbJump = "318";
                 _offsetGadgetBinds = "1240";
-
-                ReloadAddress = "460C60";
-                ReloadValuesAddress = "461900,0"; // pointer
-                FKXListCount = "460F6C";
-                ClockAddress = "36FA00";
-                CoinsAddress = "453F0C";
-                GadgetAddress = "453F04";
-                CameraPointer = "46080C";
-                DrawDistanceAddress = $"{CameraPointer},234";
-                FOVAddress = $"{CameraPointer},23C";
-                ResetCameraAddress = $"{CameraPointer},444";
-                MapIdAddress = "453E28";
-                DeathBarriersAddress = "";
-                GuardAIAddress = "37215C";
-                ActiveCharacterPointer = "37211C";
-                ActiveCharacterIdAddress = "453E2C";
-                StringTableCountAddress = "461790";
-                IsLoadingAddress = "452380";
-
-                DAG.RootNodePointer = "460158";
-                DAG.CurrentCheckpointNodePointer = "460998";
-                DAG.ClusterIdAddress = "370488";
-                Savefile.SavefileStartAddress = "453E20";
-                Savefile.SavefileKeyAddressTablePointer = "46089C";
-                Savefile.SavefileKeyStringTablePointer = "460978";
+                _offsetUndetectable = "126C";
                 DAG.Sly3Time = "36FA80";
                 DAG.Sly3Flag = "460C00";
                 DAG.OffsetCheckpointEntranceValue = "A4";
@@ -271,6 +183,35 @@ namespace SlyMultiTrainer
                 DAG.OffsetChildrenCount = "8C";
                 DAG.OffsetAttributesForCluster = "C0";
                 DAG.OffsetAttributes = "C4";
+                DAG.OffsetVerticalLayer = "FC";
+
+                ReloadAddress = "460C60";
+                ReloadValuesAddress = "461900,0"; // pointer
+                FKXListCountAddress = "460F6C";
+                ClockAddress = "36FA00";
+                CoinsAddress = "453F0C";
+                GadgetAddress = "453F04";
+                CameraPointer = "46080C";
+                DrawDistanceAddress = $"{CameraPointer},234";
+                FOVAddress = $"{CameraPointer},23C";
+                ResetCameraAddress = $"{CameraPointer},444";
+                CanCameraNoclipAddress = "325DD8";
+                MapIdAddress = "453E28";
+                GuardAIAddress = "37215C";
+                ActiveCharacterPointer = "37211C";
+                ActiveCharacterIdAddress = "453E2C";
+                StringTableCountAddress = "461790";
+                IsLoadingAddress = "452380";
+                EntranceRootNodePointer = "45FBAC";
+                DAG.RootNodePointer = "460158";
+                DAG.CurrentCheckpointNodePointer = "460998";
+                DAG.ClusterIdAddress = "370488";
+                Savefile.SavefileStartAddress = "453E20";
+                Savefile.SavefileAddressTablePointer = "46089C";
+                Savefile.SavefileStringTablePointer = "460978";
+                ControllerAddress = "371018";
+                DialoguePointer = "45C6C0";
+                SkipFMVPointer = "374550";
 
                 Maps[0].IsVisible = false;
                 Maps[1].Name = "dvd_menu";
@@ -297,61 +238,66 @@ namespace SlyMultiTrainer
                 {
                     new()
                     {
-                        new("Smoke Bomb", 0x15),
-                        new("Combat Dodge", 0x16),
-                        new("Unknown Rocket Boots", 0x17),
-                        new("Thief Reflexes", 0x1B),
-                        new("Feral Pounce", 0x1C),
-                        new("Mega Jump", 0x1D),
-                        new("Insanity Strike", 0x20),
-                        new("Voltage Attack", 0x21),
-                        new("Rage Bomb", 0x23),
-                        new("Music Box", 0x24),
-                        new("Shadow Power Level 1", 0x26),
-                        new("Time Rush", 0x27),
-                        new("Crash Disguise 1", 0x28),
-                        new("Crash Disguise 2", 0x29),
-                        new("Rocket Boots", 0x2E),
-                        new("Shadow Power Level 2", 0x2F),
-                        new("Shield", 0x31),
+                        new(_gadgetNames[GADGET_NAME.SmokeBomb], 0x15),
+                        new(_gadgetNames[GADGET_NAME.CombatDodge], 0x16),
+                        new(_gadgetNames[GADGET_NAME.UnknownRocketBoots], 0x17),
+                        new(_gadgetNames[GADGET_NAME.ThiefReflexes], 0x1B),
+                        new(_gadgetNames[GADGET_NAME.FeralPounce], 0x1C),
+                        new(_gadgetNames[GADGET_NAME.MegaJump], 0x1D),
+                        new(_gadgetNames[GADGET_NAME.InsanityStrike], 0x20),
+                        new(_gadgetNames[GADGET_NAME.VoltageAttack], 0x21),
+                        new(_gadgetNames[GADGET_NAME.RageBomb], 0x23),
+                        new(_gadgetNames[GADGET_NAME.MusicBox], 0x24),
+                        new(_gadgetNames[GADGET_NAME.ShadowPowerLevel1], 0x26),
+                        new(_gadgetNames[GADGET_NAME.TimeRush], 0x27),
+                        new(_gadgetNames[GADGET_NAME.VeniceDisguise], 0x28),
+                        new(_gadgetNames[GADGET_NAME.PopeDisguise], 0x29),
+                        new(_gadgetNames[GADGET_NAME.RocketBoots], 0x2E),
+                        new(_gadgetNames[GADGET_NAME.ShadowPowerLevel2], 0x2F),
+                        new(_gadgetNames[GADGET_NAME.Shield], 0x31),
                     },
 
                     new()
                     {
-                        new("Trigger Bomb", 0x6),
-                        new("Fishing Pole", 0x2A),
-                        new("Cube", 0x7),
-                        new("Snooze Bomb", 0x8),
-                        new("Unknown", 0xD), // Insanity Strike or Size Destabilizer
-                        new("Adrenaline Burst", 0x9),
-                        new("Health Extractor", 0xA),
-                        new("Grapple-Cam", 0x2D),
-                        new("Reduction Bomb", 0xC),
+                        new(_gadgetNames[GADGET_NAME.TriggerBomb], 0x6),
+                        new(_gadgetNames[GADGET_NAME.FishingPole], 0x2A),
+                        new(_gadgetNames[GADGET_NAME.Cube], 0x7),
+                        new(_gadgetNames[GADGET_NAME.SnoozeBomb], 0x8),
+                        new(_gadgetNames[GADGET_NAME.TemporalLock], 0xD),
+                        new(_gadgetNames[GADGET_NAME.AdrenalineBurst], 0x9),
+                        new(_gadgetNames[GADGET_NAME.HealthExtractor], 0xA),
+                        new(_gadgetNames[GADGET_NAME.GrappleCam], 0x2D),
+                        new(_gadgetNames[GADGET_NAME.ReductionBomb], 0xC),
                     },
 
                     new()
                     {
-                        new("Be The Ball", 0x2B),
-                        new("Berserker Charge", 0x12),
-                        new("Guttural Roar", 0x13),
-                        new("Fists of Flame", 0xE),
-                        new("Raging Inferno Flop", 0x14),
-                        new("Diablo Fire Slam", 0x11),
-                        new("Turnbuckle Launch", 0xF),
-                        new("Butterfly Net", 0x2C),
+                        new(_gadgetNames[GADGET_NAME.BeTheBall], 0x2B),
+                        new(_gadgetNames[GADGET_NAME.BerserkerCharge], 0x12),
+                        new(_gadgetNames[GADGET_NAME.GutturalRoar], 0x13),
+                        new(_gadgetNames[GADGET_NAME.FistsOfFlame], 0xE),
+                        new(_gadgetNames[GADGET_NAME.RagingInfernoFlop], 0x14),
+                        new(_gadgetNames[GADGET_NAME.DiabloFireSlam], 0x11),
+                        new(_gadgetNames[GADGET_NAME.TurnbuckleLaunch], 0xF),
+                        new(_gadgetNames[GADGET_NAME.ButterflyNet], 0x2C),
                     }
                 };
             }
-            else if (region == "NTSC Regular Demo")
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCDemoJuly7])
             {
-                _offsetSpeedMultiplier = "358";
                 _offsetInfiniteDbJump = "348";
-                _offsetUndetectable = "1180";
+                _offsetSpeedMultiplier = "358";
+                _offsetUndetectable = "1288";
                 _offsetGadgetBinds = "1270";
+                DAG.Sly3Time = "37A4E0";
+                DAG.Sly3Flag = "46E918";
+                DAG.OffsetMissionName = "58";
+                DAG.OffsetAttributesForCluster = "C8";
+                DAG.OffsetVerticalLayer = "110";
 
                 ReloadAddress = "46E97C";
                 ReloadValuesAddress = "2D83A0";
-                FKXListCount = "46EC60";
+                FKXListCountAddress = "46EC60";
                 ClockAddress = "37A460";
                 CoinsAddress = "45DF34";
                 GadgetAddress = "45DF28";
@@ -359,24 +305,23 @@ namespace SlyMultiTrainer
                 DrawDistanceAddress = $"{CameraPointer},114";
                 FOVAddress = $"{CameraPointer},11C";
                 ResetCameraAddress = $"{CameraPointer},324";
+                CanCameraNoclipAddress = "330700";
                 MapIdAddress = "46EA54";
-                DeathBarriersAddress = "46DCF0,2C";
                 GuardAIAddress = "37CB5C";
                 ActiveCharacterPointer = "37CB1C";
                 ActiveCharacterIdAddress = "45DE50";
                 StringTableCountAddress = "46F484";
                 IsLoadingAddress = "45CC00";
-
+                EntranceRootNodePointer = "46D78C";
                 DAG.RootNodePointer = "46DD74";
                 DAG.CurrentCheckpointNodePointer = "46E5B8";
                 DAG.ClusterIdAddress = "37AE90";
                 Savefile.SavefileStartAddress = "45DE40";
-                Savefile.SavefileKeyAddressTablePointer = "46E4BC";
-                Savefile.SavefileKeyStringTablePointer = "46E598";
-                DAG.Sly3Time = "37A4E0";
-                DAG.Sly3Flag = "46E918";
-                DAG.OffsetMissionName = "58";
-                DAG.OffsetAttributesForCluster = "C8";
+                Savefile.SavefileAddressTablePointer = "46E4BC";
+                Savefile.SavefileStringTablePointer = "46E598";
+                ControllerAddress = "37BA18";
+                DialoguePointer = "46A310";
+                SkipFMVPointer = "37EE98";
 
                 Maps[0].IsVisible = false;
                 Maps[1].IsVisible = true;
@@ -401,50 +346,60 @@ namespace SlyMultiTrainer
                 {
                     new()
                     {
-                        new("Smoke Bomb", 0x1A),
-                        new("Combat Dodge", 0x1B),
-                        new("Thief Reflexes", 0x23),
-                        new("Feral Pounce", 0x1E),
-                        new("Mega Jump", 0x1F),
-                        new("Shadow Power Level 1", 0x22),
-                        new("Unknown Rocket Boots", 0x21),
-                        new("Rocket Boots", 0x25),
-                        new("Shadow Power Level 2", 0x24),
-                        new("Shield", 0x27),
+                        new(_gadgetNames[GADGET_NAME.SmokeBomb], 0x1A),
+                        new(_gadgetNames[GADGET_NAME.CombatDodge], 0x1B),
+                        new(_gadgetNames[GADGET_NAME.ThiefReflexes], 0x23),
+                        new(_gadgetNames[GADGET_NAME.FeralPounce], 0x1E),
+                        new(_gadgetNames[GADGET_NAME.MegaJump], 0x1F),
+                        new(_gadgetNames[GADGET_NAME.ShadowPowerLevel1], 0x22),
+                        new(_gadgetNames[GADGET_NAME.UnknownRocketBoots], 0x21),
+                        new(_gadgetNames[GADGET_NAME.RocketBoots], 0x25),
+                        new(_gadgetNames[GADGET_NAME.ShadowPowerLevel2], 0x24),
+                        new(_gadgetNames[GADGET_NAME.Shield], 0x27),
+                        new(_gadgetNames[GADGET_NAME.SpinAttackLevel1], 0x2B, false),
+                        new(_gadgetNames[GADGET_NAME.SpinAttackLevel2], 0x2C, false),
+                        new(_gadgetNames[GADGET_NAME.SpinAttackLevel3], 0x2D, false),
+                        new(_gadgetNames[GADGET_NAME.JumpAttackLevel1], 0x2E, false),
+                        new(_gadgetNames[GADGET_NAME.JumpAttackLevel2], 0x2F, false),
+                        new(_gadgetNames[GADGET_NAME.JumpAttackLevel3], 0x30, false),
+                        new(_gadgetNames[GADGET_NAME.PushAttackLevel1], 0x31, false),
+                        new(_gadgetNames[GADGET_NAME.PushAttackLevel2], 0x32, false),
+                        new(_gadgetNames[GADGET_NAME.PushAttackLevel3], 0x33, false),
                     },
 
                     new()
                     {
-                        new("Trigger Bomb", 0x6),
-                        new("Fishing Pole", 0x7),
-                        new("Alarm Clock", 0x8),
-                        new("Adrenaline Burst", 0x9),
-                        new("Health Extractor", 0xA),
-                        new("Insanity Strike", 0xC),
-                        new("Grapple-Cam", 0xD),
-                        new("Size Destabilizer", 0xE),
-                        new("Rage Bomb", 0xF),
-                        new("Reduction Bomb", 0x10),
+                        new(_gadgetNames[GADGET_NAME.TriggerBomb], 0x6),
+                        new(_gadgetNames[GADGET_NAME.FishingPole], 0x7),
+                        new(_gadgetNames[GADGET_NAME.AlarmClock], 0x8),
+                        new(_gadgetNames[GADGET_NAME.AdrenalineBurst], 0x9),
+                        new(_gadgetNames[GADGET_NAME.HealthExtractor], 0xA),
+                        new(_gadgetNames[GADGET_NAME.InsanityStrike], 0xC),
+                        new(_gadgetNames[GADGET_NAME.GrappleCam], 0xD),
+                        new(_gadgetNames[GADGET_NAME.SizeDestabilizer], 0xE),
+                        new(_gadgetNames[GADGET_NAME.RageBomb], 0xF),
+                        new(_gadgetNames[GADGET_NAME.ReductionBomb], 0x10),
                     },
 
                     new()
                     {
-                        new("Be The Ball", 0x11),
-                        new("Berserker Charge", 0x12),
-                        new("Guttural Roar", 0x14),
-                        new("Fists of Flame", 0x15),
-                        new("Temporal Lock", 0x16),
-                        new("Raging Inferno Flop", 0x17),
-                        new("Diablo Fire Slam", 0x18),
-                        new("Cutscene Puppet", 0x19),
+                        new(_gadgetNames[GADGET_NAME.BeTheBall], 0x11),
+                        new(_gadgetNames[GADGET_NAME.BerserkerCharge], 0x12),
+                        new(_gadgetNames[GADGET_NAME.GutturalRoar], 0x14),
+                        new(_gadgetNames[GADGET_NAME.FistsOfFlame], 0x15),
+                        new(_gadgetNames[GADGET_NAME.TemporalLock], 0x16),
+                        new(_gadgetNames[GADGET_NAME.RagingInfernoFlop], 0x17),
+                        new(_gadgetNames[GADGET_NAME.DiabloFireSlam], 0x18),
+                        new(_gadgetNames[GADGET_NAME.CutscenePuppet], 0x19),
                     }
                 };
             }
-            else if (region == "PAL Demo")
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.PALDemo])
             {
+                // SCED-53802 - BAE3B5E9
                 ReloadAddress = "485744";
                 ReloadValuesAddress = "2E9DD8";
-                FKXListCount = "485A2C";
+                FKXListCountAddress = "485A2C";
                 ClockAddress = "38F660";
                 CoinsAddress = "474D7C";
                 GadgetAddress = "474D6C";
@@ -452,21 +407,25 @@ namespace SlyMultiTrainer
                 DrawDistanceAddress = $"{CameraPointer},114";
                 FOVAddress = $"{CameraPointer},11C";
                 ResetCameraAddress = $"{CameraPointer},2F4";
+                CanCameraNoclipAddress = "345170";
                 MapIdAddress = "474CD8";
-                DeathBarriersAddress = "484B74,2C";
                 GuardAIAddress = "39338C";
                 ActiveCharacterPointer = "39330C";
                 ActiveCharacterIdAddress = "3901D0";
+                StringTableCountAddress = "486254";
+                IsLoadingAddress = "473A80";
+                EntranceRootNodePointer = "484600";
                 DAG.RootNodePointer = "484C0C";
                 DAG.CurrentCheckpointNodePointer = "48544C";
                 DAG.ClusterIdAddress = "391658";
-                Savefile.SavefileStartAddress = "474CD0";
-                Savefile.SavefileKeyAddressTablePointer = "48534C";
-                Savefile.SavefileKeyStringTablePointer = "485428";
                 DAG.Sly3Time = "38F6E0";
                 DAG.Sly3Flag = "4856D4";
-                StringTableCountAddress = "486254";
-                IsLoadingAddress = "473A80";
+                Savefile.SavefileStartAddress = "474CD0";
+                Savefile.SavefileAddressTablePointer = "48534C";
+                Savefile.SavefileStringTablePointer = "485428";
+                ControllerAddress = "392218";
+                DialoguePointer = "4811A0";
+                SkipFMVPointer = "395708";
 
                 Maps[0].IsVisible = false;
                 Maps[1].IsVisible = true;
@@ -487,19 +446,200 @@ namespace SlyMultiTrainer
                 Maps[20].IsVisible = false;
                 Maps.RemoveRange(22, 18);
             }
-            else if (region == "PAL August 2")
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.PALDemoSeptember2])
             {
+                ReloadAddress = "4856C4";
+                ReloadValuesAddress = "2E9D58";
+                FKXListCountAddress = "4859AC";
+                ClockAddress = "38F5E0";
+                CoinsAddress = "474CFC";
+                GadgetAddress = "474CEC";
+                CameraPointer = "48523C";
+                DrawDistanceAddress = $"{CameraPointer},114";
+                FOVAddress = $"{CameraPointer},11C";
+                ResetCameraAddress = $"{CameraPointer},2F4";
+                CanCameraNoclipAddress = "3450F0";
+                MapIdAddress = "474C58";
+                GuardAIAddress = "39330C";
+                ActiveCharacterPointer = "39328C";
+                ActiveCharacterIdAddress = "390150";
+                StringTableCountAddress = "4861D4";
+                IsLoadingAddress = "473A00";
+                EntranceRootNodePointer = "484580";
+                DAG.RootNodePointer = "484B8C";
+                DAG.CurrentCheckpointNodePointer = "4853CC";
+                DAG.ClusterIdAddress = "3915D8";
+                DAG.Sly3Time = "38F660";
+                DAG.Sly3Flag = "485654";
+                Savefile.SavefileStartAddress = "474C50";
+                Savefile.SavefileAddressTablePointer = "4852CC";
+                Savefile.SavefileStringTablePointer = "4853A8";
+                ControllerAddress = "392198";
+                DialoguePointer = "481120";
+                SkipFMVPointer = "395688";
+
+                Maps[0].IsVisible = false;
+                Maps[1].IsVisible = true;
+                Maps[2].IsVisible = false;
+                Maps[4].IsVisible = false;
+                Maps[5].IsVisible = false;
+                Maps[7].IsVisible = false;
+                Maps[9].IsVisible = false;
+                Maps[10].IsVisible = false;
+                Maps[11].IsVisible = false;
+                Maps[12].IsVisible = false;
+                Maps[14].IsVisible = false;
+                Maps[15].IsVisible = false;
+                Maps[16].IsVisible = false;
+                Maps[17].IsVisible = false;
+                Maps[18].IsVisible = false;
+                Maps[19].IsVisible = false;
+                Maps[20].IsVisible = false;
+                Maps.RemoveRange(22, 18);
+            }
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCJuly16])
+            {
+                // SCUS-97464 - 0190CF8B
+                _offsetInfiniteDbJump = "348";
+                _offsetSpeedMultiplier = "358";
+                _offsetUndetectable = "12A0";
+                _offsetGadgetBinds = "1270";
+                DAG.OffsetVerticalLayer = "110";
+
+                ReloadAddress = "46BB24";
+                ReloadValuesAddress = "2DEB08";
+                FKXListCountAddress = "46BE0C";
+                ClockAddress = "35F6A0";
+                CoinsAddress = "45B0A8";
+                GadgetAddress = "45B09C";
+                CameraPointer = "46B5AC";
+                DrawDistanceAddress = $"{CameraPointer},114";
+                FOVAddress = $"{CameraPointer},11C";
+                ResetCameraAddress = $"{CameraPointer},324";
+                CanCameraNoclipAddress = "33E510";
+                MapIdAddress = "46BBFC";
+                GuardAIAddress = "362F1C";
+                ActiveCharacterPointer = "361D5C";
+                ActiveCharacterIdAddress = "45AFC4";
+                StringTableCountAddress = "46C624";
+                IsLoadingAddress = "459D80";
+                EntranceRootNodePointer = "46A90C";
+                DAG.RootNodePointer = "46AEF4";
+                DAG.CurrentCheckpointNodePointer = "46B738";
+                DAG.ClusterIdAddress = "3600D0";
+                DAG.Sly3Time = "35F720";
+                DAG.Sly3Flag = "46BAC8";
+                Savefile.SavefileStartAddress = "45AFB0";
+                Savefile.SavefileAddressTablePointer = "46B63C";
+                Savefile.SavefileStringTablePointer = "46B718";
+                ControllerAddress = "360C58";
+                DialoguePointer = "467480";
+                SkipFMVPointer = "37C068";
+
+                for (int i = 23; i < 35; i++)
+                {
+                    Maps[i].IsVisible = false;
+                }
+
+                Maps.RemoveRange(36, 4);
+
+                Gadgets = new()
+                {
+                    new()
+                    {
+                        new(_gadgetNames[GADGET_NAME.SmokeBomb], 0x1A),
+                        new(_gadgetNames[GADGET_NAME.CombatDodge], 0x1B),
+                        new(_gadgetNames[GADGET_NAME.FeralPounce], 0x1E),
+                        new(_gadgetNames[GADGET_NAME.MegaJump], 0x1F),
+                        new(_gadgetNames[GADGET_NAME.KnockoutDive], 0x20),
+                        new(_gadgetNames[GADGET_NAME.UnknownRocketBoots], 0x21),
+                        new(_gadgetNames[GADGET_NAME.ShadowPowerLevel1], 0x22),
+                        new(_gadgetNames[GADGET_NAME.ThiefReflexes], 0x23),
+                        new(_gadgetNames[GADGET_NAME.ShadowPowerLevel2], 0x24),
+                        new(_gadgetNames[GADGET_NAME.RocketBoots], 0x25),
+                        new(_gadgetNames[GADGET_NAME.TreasureMap], 0x26),
+                        new(_gadgetNames[GADGET_NAME.Shield], 0x27),
+                        new(_gadgetNames[GADGET_NAME.VeniceDisguise], 0x28),
+                        new(_gadgetNames[GADGET_NAME.PhotographerDisguise], 0x29),
+                        new(_gadgetNames[GADGET_NAME.PirateDisguise], 0x2A),
+                    },
+
+                    new()
+                    {
+                        new(_gadgetNames[GADGET_NAME.TriggerBomb], 0x6),
+                        new(_gadgetNames[GADGET_NAME.FishingPole], 0x7),
+                        new(_gadgetNames[GADGET_NAME.AlarmClock], 0x8),
+                        new(_gadgetNames[GADGET_NAME.AdrenalineBurst], 0x9),
+                        new(_gadgetNames[GADGET_NAME.HealthExtractor], 0xA),
+                        new(_gadgetNames[GADGET_NAME.InsanityStrike], 0xC),
+                        new(_gadgetNames[GADGET_NAME.GrappleCam], 0xD),
+                        new(_gadgetNames[GADGET_NAME.SizeDestabilizer], 0xE),
+                        new(_gadgetNames[GADGET_NAME.RageBomb], 0xF),
+                        new(_gadgetNames[GADGET_NAME.ReductionBomb], 0x10),
+                    },
+
+                    new()
+                    {
+                        new(_gadgetNames[GADGET_NAME.BeTheBall], 0x11),
+                        new(_gadgetNames[GADGET_NAME.BerserkerCharge], 0x12),
+                        new(_gadgetNames[GADGET_NAME.GutturalRoar], 0x14),
+                        new(_gadgetNames[GADGET_NAME.FistsOfFlame], 0x15),
+                        new(_gadgetNames[GADGET_NAME.TemporalLock], 0x16),
+                        new(_gadgetNames[GADGET_NAME.RagingInfernoFlop], 0x17),
+                        new(_gadgetNames[GADGET_NAME.DiabloFireSlam], 0x18),
+                        new(_gadgetNames[GADGET_NAME.CutscenePuppet], 0x19),
+                    }
+                };
+            }
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCAugust24])
+            {
+                // SCUS-97464 - 779B6999
+                ReloadAddress = "4806C4";
+                ReloadValuesAddress = "2EE858";
+                FKXListCountAddress = "4809AC";
+                ClockAddress = "372AA0";
+                CoinsAddress = "46FCDC";
+                GadgetAddress = "46FCCC";
+                CameraPointer = "48023C";
+                DrawDistanceAddress = $"{CameraPointer},114";
+                FOVAddress = $"{CameraPointer},11C";
+                ResetCameraAddress = $"{CameraPointer},2F4";
+                CanCameraNoclipAddress = "350EA0";
+                MapIdAddress = "48079C";
+                GuardAIAddress = "37798C";
+                ActiveCharacterPointer = "37674C";
+                ActiveCharacterIdAddress = "373610";
+                StringTableCountAddress = "4811D4";
+                IsLoadingAddress = "46EA00";
+                EntranceRootNodePointer = "47F580";
+                DAG.RootNodePointer = "47FB8C";
+                DAG.CurrentCheckpointNodePointer = "4803CC";
+                DAG.ClusterIdAddress = "374A98";
+                DAG.Sly3Time = "372B20";
+                DAG.Sly3Flag = "480654";
+                Savefile.SavefileStartAddress = "46FC30";
+                Savefile.SavefileAddressTablePointer = "4802CC";
+                Savefile.SavefileStringTablePointer = "4803A8";
+                ControllerAddress = "375658";
+                DialoguePointer = "47C100";
+                SkipFMVPointer = "390B18";
+            }
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.PALAugust2])
+            {
+                // SCES-52529 - 8C146034
                 _offsetHealth = "170";
                 _offsetGadgetPower = "178";
+                _offsetRadTarget = "1CC";
+                _offsetDeltaTranslation = "260";
                 _offsetInfiniteDbJump = "34C";
-                _offsetInvulnerable = "184";
-                _offsetUndetectable = "1190";
                 _offsetSpeedMultiplier = "368";
+                _offsetUndetectable = "12B0";
                 _offsetGadgetBinds = "1280";
+                DAG.OffsetVerticalLayer = "110";
 
                 ReloadAddress = "4AF7CC";
                 ReloadValuesAddress = "2F8068";
-                FKXListCount = "4AFAB4";
+                FKXListCountAddress = "4AFAB4";
                 ClockAddress = "38B1A0";
                 CoinsAddress = "49E750";
                 GadgetAddress = "49E740";
@@ -507,35 +647,41 @@ namespace SlyMultiTrainer
                 DrawDistanceAddress = $"{CameraPointer},114";
                 FOVAddress = $"{CameraPointer},11C";
                 ResetCameraAddress = $"{CameraPointer},324";
+                CanCameraNoclipAddress = "385DC0";
                 MapIdAddress = "4AF8A4";
-                DeathBarriersAddress = "4AEBF4,2C";
                 GuardAIAddress = "38EEA4";
                 ActiveCharacterPointer = "38EE5C";
                 ActiveCharacterIdAddress = "38BD40";
+                StringTableCountAddress = "4B02C4";
+                IsLoadingAddress = "49D480";
+                EntranceRootNodePointer = "4AE680";
                 DAG.RootNodePointer = "4AEC8C";
                 DAG.CurrentCheckpointNodePointer = "4AF4C8";
                 DAG.ClusterIdAddress = "38D1B8";
-                Savefile.SavefileStartAddress = "49E6B0";
-                Savefile.SavefileKeyAddressTablePointer = "4AF3CC";
-                Savefile.SavefileKeyStringTablePointer = "4AF4A8";
                 DAG.Sly3Time = "38B220";
                 DAG.Sly3Flag = "4AF770";
-                StringTableCountAddress = "4B02C4";
-                IsLoadingAddress = "49D480";
+                Savefile.SavefileStartAddress = "49E6B0";
+                Savefile.SavefileAddressTablePointer = "4AF3CC";
+                Savefile.SavefileStringTablePointer = "4AF4A8";
+                ControllerAddress = "38DD58";
+                DialoguePointer = "4AB200";
+                SkipFMVPointer = "3BF248";
             }
-            else if (region == "PAL September 2")
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.PALSeptember2])
             {
+                // SCES-53409 - 3670B6F9
                 _offsetHealth = "170";
                 _offsetGadgetPower = "178";
+                _offsetRadTarget = "1CC";
+                _offsetDeltaTranslation = "260";
                 _offsetInfiniteDbJump = "34C";
-                _offsetInvulnerable = "184";
-                _offsetUndetectable = "1170";
                 _offsetSpeedMultiplier = "364";
+                _offsetUndetectable = "1290";
                 _offsetGadgetBinds = "1260";
 
                 ReloadAddress = "4BE9C4";
                 ReloadValuesAddress = "304248";
-                FKXListCount = "4BECAC";
+                FKXListCountAddress = "4BECAC";
                 ClockAddress = "39A1A0";
                 CoinsAddress = "4AD95C";
                 GadgetAddress = "4AD94C";
@@ -543,129 +689,53 @@ namespace SlyMultiTrainer
                 DrawDistanceAddress = $"{CameraPointer},114";
                 FOVAddress = $"{CameraPointer},11C";
                 ResetCameraAddress = $"{CameraPointer},2F4";
+                CanCameraNoclipAddress = "394D20";
                 MapIdAddress = "4BEA9C";
-                DeathBarriersAddress = "4BDDF4,2C";
                 GuardAIAddress = "39DF54";
                 ActiveCharacterPointer = "39DECC";
                 ActiveCharacterIdAddress = "39AD40";
+                StringTableCountAddress = "4BF4D4";
+                IsLoadingAddress = "4AC680";
+                EntranceRootNodePointer = "4BD880";
                 DAG.RootNodePointer = "4BDE8C";
                 DAG.CurrentCheckpointNodePointer = "4BE6CC";
                 DAG.ClusterIdAddress = "39C1C8";
-                Savefile.SavefileStartAddress = "4AD8B0";
-                Savefile.SavefileKeyAddressTablePointer = "4BE5CC";
-                Savefile.SavefileKeyStringTablePointer = "4BE6A8";
                 DAG.Sly3Time = "39A220";
                 DAG.Sly3Flag = "4BE954";
-                StringTableCountAddress = "4BF4D4";
-                IsLoadingAddress = "4AC680";
+                Savefile.SavefileStartAddress = "4AD8B0";
+                Savefile.SavefileAddressTablePointer = "4BE5CC";
+                Savefile.SavefileStringTablePointer = "4BE6A8";
+                ControllerAddress = "39CDD8";
+                DialoguePointer = "4BA410";
+                SkipFMVPointer = "3CE288";
             }
-            else if (region == "NTSC (PS3)"
-                  || region == "PAL (PS3)"
-                  || region == "UK (PS3)")
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCPS3PSN]
+                  || build.Region == Util.BuildRegions[BUILD_NAME.PALPS3PSN]
+                  || build.Region == Util.BuildRegions[BUILD_NAME.NTSCKPS3PSN])
             {
                 _encoding = Encoding.BigEndianUnicode;
                 _offsetHealth = "168";
                 _offsetGadgetPower = "170";
-                _offsetController = "130";
-                _offsetControllerBinds = "1E";
+                _offsetRadTarget = "1AC";
+                _offsetDeltaTranslation = "240";
                 _offsetInfiniteDbJump = "32C";
                 _offsetSpeedMultiplier = "344";
-                _offsetInvulnerable = "17C";
-                _offsetUndetectable = "1150";
+                _offsetUndetectable = "1270";
                 _offsetGadgetBinds = "1240";
-
-                ReloadAddress = "70FD3C";
-                ReloadValuesAddress = "4930D0";
-                FKXListCount = "710024";
-                ClockAddress = "514338";
-                CoinsAddress = "657284";
-                GadgetAddress = "657274";
-                CameraPointer = "70F8AC";
-                DrawDistanceAddress = $"{CameraPointer},114";
-                FOVAddress = $"{CameraPointer},11C";
-                ResetCameraAddress = $"{CameraPointer},304";
-                MapIdAddress = "70FE14";
-                DeathBarriersAddress = "70F164,2C";
-                GuardAIAddress = "57714C";
-                ActiveCharacterPointer = "5770CC";
-                ActiveCharacterIdAddress = "574A80";
-                DAG.RootNodePointer = "70F1FC";
-                DAG.CurrentCheckpointNodePointer = "70FA3C";
-                DAG.ClusterIdAddress = "575F08";
-                Savefile.SavefileStartAddress = "6571D0";
-                Savefile.SavefileKeyAddressTablePointer = "70F93C";
-                Savefile.SavefileKeyStringTablePointer = "70FA18";
-                DAG.Sly3Time = "5143B0";
-                DAG.Sly3Flag = "70FCCC";
-                StringTableCountAddress = "710854";
-                IsLoadingAddress = "656080";
-            }
-            else if (region == "NTSC-J (PS3)")
-            {
-                _encoding = Encoding.BigEndianUnicode;
-                _offsetHealth = "168";
-                _offsetGadgetPower = "170";
-                _offsetController = "130";
-                _offsetControllerBinds = "1E";
-                _offsetInfiniteDbJump = "32C";
-                _offsetSpeedMultiplier = "344";
-                _offsetInvulnerable = "17C";
-                _offsetUndetectable = "1150";
-                _offsetGadgetBinds = "1240";
-
-                ReloadAddress = "717DBC";
-                ReloadValuesAddress = "493110";
-                FKXListCount = "7180A4";
-                ClockAddress = "5143B8";
-                CoinsAddress = "657304";
-                GadgetAddress = "6572F4";
-                CameraPointer = "71792C";
-                DrawDistanceAddress = $"{CameraPointer},114";
-                FOVAddress = $"{CameraPointer},11C";
-                ResetCameraAddress = $"{CameraPointer},304";
-                MapIdAddress = "717E94";
-                DeathBarriersAddress = "7171E4,2C";
-                GuardAIAddress = "5771CC";
-                ActiveCharacterPointer = "57714C";
-                ActiveCharacterIdAddress = "574B00";
-                DAG.RootNodePointer = "71727C";
-                DAG.CurrentCheckpointNodePointer = "717ABC";
-                DAG.ClusterIdAddress = "575F88";
-                Savefile.SavefileStartAddress = "657250";
-                Savefile.SavefileKeyAddressTablePointer = "7179BC";
-                Savefile.SavefileKeyStringTablePointer = "717A98";
-                DAG.Sly3Time = "514430";
-                DAG.Sly3Flag = "717D4C";
-                StringTableCountAddress = "7188D4";
-                IsLoadingAddress = "656100";
-            }
-            else if (region == "NTSC (PS3 PSN)"
-                  || region == "PAL (PS3 PSN)"
-                  || region == "NTSC-K (PS3 PSN)")
-            {
-                _encoding = Encoding.BigEndianUnicode;
-                _offsetHealth = "168";
-                _offsetGadgetPower = "170";
-                _offsetController = "130";
-                _offsetControllerBinds = "1E";
-                _offsetInfiniteDbJump = "32C";
-                _offsetSpeedMultiplier = "344";
-                _offsetInvulnerable = "17C";
-                _offsetUndetectable = "1150";
-                _offsetGadgetBinds = "1240";
+                _offsetDialogueFlags = "5D";
 
                 ReloadAddress = "78D2C0";
-                ReloadValuesAddress = "508650";
-                if (region == "NTSC (PS3 PSN)")
+                ReloadValuesAddress = "508630";
+                if (build.Region == Util.BuildRegions[BUILD_NAME.PALPS3PSN])
                 {
-                    ReloadValuesAddress = "508630";
+                    ReloadValuesAddress = "508650";
                 }
-                else if (region == "NTSC-K (PS3 PSN)")
+                else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCKPS3PSN])
                 {
                     ReloadValuesAddress = "508610";
                 }
 
-                FKXListCount = "78D5A8";
+                FKXListCountAddress = "78D5A8";
                 ClockAddress = "5898B8";
                 CoinsAddress = "6CC808";
                 GadgetAddress = "6CC7F8";
@@ -673,25 +743,124 @@ namespace SlyMultiTrainer
                 DrawDistanceAddress = $"{CameraPointer},114";
                 FOVAddress = $"{CameraPointer},11C";
                 ResetCameraAddress = $"{CameraPointer},304";
+                CanCameraNoclipAddress = "7D64D4";
                 MapIdAddress = "78D398";
-                DeathBarriersAddress = "78C6E4,2C";
                 GuardAIAddress = "5EC6CC";
                 ActiveCharacterPointer = "5EC64C";
                 ActiveCharacterIdAddress = "5EA000";
+                StringTableCountAddress = "78DDD4";
+                IsLoadingAddress = "6CB600";
+                EntranceRootNodePointer = "78C170";
                 DAG.RootNodePointer = "78C77C";
                 DAG.CurrentCheckpointNodePointer = "78CFBC";
                 DAG.ClusterIdAddress = "5EB488";
-                Savefile.SavefileStartAddress = "6CC750";
-                Savefile.SavefileKeyAddressTablePointer = "78CEBC";
-                Savefile.SavefileKeyStringTablePointer = "78CF98";
                 DAG.Sly3Time = "589930";
                 DAG.Sly3Flag = "78D250";
-                StringTableCountAddress = "78DDD4";
-                IsLoadingAddress = "6CB600";
+                Savefile.SavefileStartAddress = "6CC750";
+                Savefile.SavefileAddressTablePointer = "78CEBC";
+                Savefile.SavefileStringTablePointer = "78CF98";
+                ControllerAddress = "5EC5AA";
+                DialoguePointer = "788CB8";
+                SkipFMVPointer = "83C8BC";
+            }
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCPS3]
+                  || build.Region == Util.BuildRegions[BUILD_NAME.PALPS3]
+                  || build.Region == Util.BuildRegions[BUILD_NAME.UKPS3])
+            {
+                _encoding = Encoding.BigEndianUnicode;
+                _offsetHealth = "168";
+                _offsetGadgetPower = "170";
+                _offsetRadTarget = "1AC";
+                _offsetDeltaTranslation = "240";
+                _offsetInfiniteDbJump = "32C";
+                _offsetSpeedMultiplier = "344";
+                _offsetUndetectable = "1270";
+                _offsetGadgetBinds = "1240";
+                _offsetDialogueFlags = "5D";
+
+                ReloadAddress = "70FD3C";
+                ReloadValuesAddress = "4930D0";
+                FKXListCountAddress = "710024";
+                ClockAddress = "514338";
+                CoinsAddress = "657284";
+                GadgetAddress = "657274";
+                CameraPointer = "70F8AC";
+                DrawDistanceAddress = $"{CameraPointer},114";
+                FOVAddress = $"{CameraPointer},11C";
+                ResetCameraAddress = $"{CameraPointer},304";
+                CanCameraNoclipAddress = "758F68";
+                MapIdAddress = "70FE14";
+                GuardAIAddress = "57714C";
+                ActiveCharacterPointer = "5770CC";
+                ActiveCharacterIdAddress = "574A80";
+                StringTableCountAddress = "710854";
+                IsLoadingAddress = "656080";
+                EntranceRootNodePointer = "70EBF0";
+                DAG.RootNodePointer = "70F1FC";
+                DAG.CurrentCheckpointNodePointer = "70FA3C";
+                DAG.ClusterIdAddress = "575F08";
+                DAG.Sly3Time = "5143B0";
+                DAG.Sly3Flag = "70FCCC";
+                Savefile.SavefileStartAddress = "6571D0";
+                Savefile.SavefileAddressTablePointer = "70F93C";
+                Savefile.SavefileStringTablePointer = "70FA18";
+                ControllerAddress = "57702A";
+                DialoguePointer = "70B738";
+                SkipFMVPointer = "78451C";
+            }
+            else if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCJPS3]
+                  || build.Region == Util.BuildRegions[BUILD_NAME.NTSCKPS3])
+            {
+                _encoding = Encoding.BigEndianUnicode;
+                _offsetHealth = "168";
+                _offsetGadgetPower = "170";
+                _offsetRadTarget = "1AC";
+                _offsetDeltaTranslation = "240";
+                _offsetInfiniteDbJump = "32C";
+                _offsetSpeedMultiplier = "344";
+                _offsetUndetectable = "1270";
+                _offsetGadgetBinds = "1240";
+                _offsetDialogueFlags = "5D";
+
+                ReloadAddress = "717DBC";
+                ReloadValuesAddress = "493110";
+                if (build.Region == Util.BuildRegions[BUILD_NAME.NTSCKPS3])
+                {
+                    ReloadValuesAddress = "4930F0";
+                }
+
+                FKXListCountAddress = "7180A4";
+                ClockAddress = "5143B8";
+                CoinsAddress = "657304";
+                GadgetAddress = "6572F4";
+                CameraPointer = "71792C";
+                DrawDistanceAddress = $"{CameraPointer},114";
+                FOVAddress = $"{CameraPointer},11C";
+                ResetCameraAddress = $"{CameraPointer},304";
+                CanCameraNoclipAddress = "760FE8";
+                MapIdAddress = "717E94";
+                GuardAIAddress = "5771CC";
+                ActiveCharacterPointer = "57714C";
+                ActiveCharacterIdAddress = "574B00";
+                StringTableCountAddress = "7188D4";
+                IsLoadingAddress = "656100";
+                EntranceRootNodePointer = "716C70";
+                DAG.RootNodePointer = "71727C";
+                DAG.CurrentCheckpointNodePointer = "717ABC";
+                DAG.ClusterIdAddress = "575F88";
+                DAG.Sly3Time = "514430";
+                DAG.Sly3Flag = "717D4C";
+                Savefile.SavefileStartAddress = "657250";
+                Savefile.SavefileAddressTablePointer = "7179BC";
+                Savefile.SavefileStringTablePointer = "717A98";
+                ControllerAddress = "5770AA";
+                DialoguePointer = "7137B8";
+                SkipFMVPointer = "78C59C";
             }
 
             _offsetTransformationLocal = $"{_offsetTransformationOrigin}+4";
             _offsetTransformationWorld = $"{_offsetTransformationOrigin}+8";
+            _offsetTransformationFinal = $"{_offsetTransformationOrigin}+C";
         }
 
         public override void CustomTick()
@@ -699,10 +868,54 @@ namespace SlyMultiTrainer
 
         }
 
+        public override void OnFirstLoopAfterLoading(int mapId)
+        {
+            Savefile.Init();
+
+            // In sly 3, not all characters are available in all maps (e.g. ep1 police station only has sly)
+            // So, we need to filter the character list based on the entities list
+            var list = GetFKXList();
+            List<Character_t> newCharacters = new(Characters);
+            for (int i = 0; i < newCharacters.Count; i++)
+            {
+                var character = newCharacters[i];
+                var fkEntity = list.FirstOrDefault(x => x.Name == character.InternalName);
+                if (fkEntity == null || fkEntity.SpawnRule == 0)
+                {
+                    // Remove if not found or its spawn rule is 0 (shaman in kaine island)
+                    newCharacters.Remove(character);
+                    i--;
+                    continue;
+                }
+
+                // Sly 3 NTSC Demo April 18 doesn't have the same ids as retail
+                // So let's read them on the fly
+                int id = _m.ReadInt((fkEntity.EntityAddress[0] + 0x18).ToString("X"));
+                newCharacters[i].Id = id;
+            }
+
+            if (newCharacters.Count != 0)
+            {
+                if (!newCharacters.SequenceEqual((List<Character_t>)_form.cmbActChar.DataSource))
+                {
+                    _form.UpdateUI(() =>
+                    {
+                        var last = _form.cmbActChar.SelectedItem;
+                        _form.cmbActChar.DataSource = newCharacters;
+                        if (newCharacters.Contains(last))
+                        {
+                            // If the new map contains the latest character, select it
+                            _form.cmbActChar.SelectedItem = last;
+                        }
+                    });
+                }
+            }
+        }
+
         public override bool IsLoading()
         {
             if (_m.ReadInt(IsLoadingAddress) == 3
-                && _m.ReadInt(Savefile.SavefileKeyAddressTablePointer) != 0)
+             && _m.ReadInt(Savefile.SavefileAddressTablePointer) != 0)
             {
                 return false;
             }
@@ -711,6 +924,34 @@ namespace SlyMultiTrainer
         }
 
         #region Gadgets
+        public override void ToggleAllGadgets()
+        {
+            long gadgets = ReadGadgets();
+            if (gadgets == -1)
+            {
+                // Some of the "gadgets" are actually essential skillset
+                // For example sly's square attack, binocucom, or bentley mines
+                // The following value is the value set by the game when loading a new game
+                // from NTSC at 349938 (array of 9 ints, each int is the bit index)
+                gadgets = 0x00000200000200FE;
+                if (Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCJuly16]
+                 || Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoJuly7])
+                {
+                    gadgets = 0x00000800000200FE;
+                }
+                else if (Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoApril18])
+                {
+                    gadgets = 0;
+                }
+            }
+            else
+            {
+                gadgets = -1;
+            }
+
+            WriteGadgets(gadgets);
+        }
+
         public int ReadActCharGadgetPower()
         {
             return _m.ReadInt($"{ActiveCharacterPointer},{_offsetGadgetPower}");
@@ -751,8 +992,8 @@ namespace SlyMultiTrainer
             _m.WriteMemory($"{ActiveCharacterPointer},{_offsetGadgetBinds}+{(int)bind * 0xC + 4:X}", "int", "0");
 
             // Write to savefile too so that it persists after reload
-            var addr = Savefile.GetSavefileAddress(ActiveCharacter.NameForSavefile, "apukCur");
-            _m.WriteMemory($"{addr:X}+{(int)bind * 0x4:X}", "int", value.ToString());
+            var address = Savefile.GetSavefileAddress(ActiveCharacter.NameForSavefile, "apukCur");
+            _m.WriteMemory($"{address:X}+{(int)bind * 0x4:X}", "int", value.ToString());
         }
         #endregion
 
@@ -768,6 +1009,13 @@ namespace SlyMultiTrainer
             return true;
         }
 
+        public override Vector3 ReadEntityDeltaTranslation(string pointerToEntity)
+        {
+            Vector3 delta = _m.ReadVector3($"{pointerToEntity},{_offsetDeltaTranslation}");
+            delta = delta * -1;
+            return delta;
+        }
+
         #region Origin
         public override Matrix4x4 ReadEntityOriginTransformation(string pointerToEntity)
         {
@@ -779,6 +1027,25 @@ namespace SlyMultiTrainer
             return _m.ReadMatrix4($"{pointerToEntity},{_offsetTransformationOrigin},0");
         }
 
+        public override Matrix4x4 ReadEntityOriginCombinedTransformation(string pointerToEntity)
+        {
+            if (!EntityHasTransformation(pointerToEntity))
+            {
+                return Matrix4x4.Identity;
+            }
+
+            return _m.ReadMatrix4($"{pointerToEntity},{_offsetTransformationOrigin},40");
+        }
+
+        public override void WriteEntityOriginTransformation(string pointerToEntity, Matrix4x4 transformation)
+        {
+            if (!EntityHasTransformation(pointerToEntity))
+            {
+                return;
+            }
+
+            _m.WriteMemory($"{pointerToEntity},{_offsetTransformationOrigin},0", "mat4", transformation.ToString());
+        }
         #endregion
 
         #region Local
@@ -792,9 +1059,29 @@ namespace SlyMultiTrainer
             return _m.ReadMatrix4($"{pointerToEntity},{_offsetTransformationLocal},0");
         }
 
+        public override Matrix4x4 ReadEntityLocalCombinedTransformation(string pointerToEntity)
+        {
+            if (!EntityHasTransformation(pointerToEntity))
+            {
+                return Matrix4x4.Identity;
+            }
+
+            return _m.ReadMatrix4($"{pointerToEntity},{_offsetTransformationLocal},40");
+        }
+
         public override Vector3 ReadEntityLocalTranslation(string pointerToEntity)
         {
             return ReadEntityLocalTransformation(pointerToEntity).Translation;
+        }
+
+        public override void WriteEntityLocalTransformation(string pointerToEntity, Matrix4x4 transformation)
+        {
+            if (!EntityHasTransformation(pointerToEntity))
+            {
+                return;
+            }
+
+            _m.WriteMemory($"{pointerToEntity},{_offsetTransformationLocal},0", "mat4", transformation.ToString());
         }
 
         public override void WriteEntityLocalTranslation(string pointerToEntity, Vector3 value)
@@ -874,6 +1161,16 @@ namespace SlyMultiTrainer
             _m.WriteMemory($"{pointerToEntity},{_offsetTransformationLocal},14", "float", scale.ToString());
             _m.WriteMemory($"{pointerToEntity},{_offsetTransformationLocal},28", "float", scale.ToString());
         }
+
+        public override Vector3 ReadEntityLocalVelocity(string pointerToEntity)
+        {
+            return _m.ReadVector3($"{pointerToEntity},{_offsetTransformationLocal},B0");
+        }
+
+        public override void WriteEntityLocalVelocity(string pointerToEntity, Vector3 value)
+        {
+            _m.WriteMemory($"{pointerToEntity},{_offsetTransformationLocal},B0", "vec3", value.ToString());
+        }
         #endregion
 
         #region World
@@ -887,18 +1184,30 @@ namespace SlyMultiTrainer
             return _m.ReadMatrix4($"{pointerToEntity},{_offsetTransformationWorld},0");
         }
 
-        public override void WriteEntityWorldTransformation(string pointerToEntity, Matrix4x4 value)
+        public override Matrix4x4 ReadEntityWorldCombinedTransformation(string pointerToEntity)
+        {
+            if (!EntityHasTransformation(pointerToEntity))
+            {
+                return Matrix4x4.Identity;
+            }
+
+            return _m.ReadMatrix4($"{pointerToEntity},{_offsetTransformationWorld},40");
+        }
+
+        public override void WriteEntityWorldTransformation(string pointerToEntity, Matrix4x4 trans)
         {
             if (!EntityHasTransformation(pointerToEntity))
             {
                 return;
             }
 
-            _m.WriteMemory($"{pointerToEntity},{_offsetTransformationWorld},0", "mat4", value.ToString());
+            float radTarget = Convert.ToSingle(Math.Atan2(trans.M12, trans.M11));
+            _m.WriteMemory($"{pointerToEntity},{_offsetTransformationWorld},0", "mat3", trans.ToString());
+            _m.WriteMemory($"{pointerToEntity},{_offsetRadTarget}", "float", radTarget.ToString());
         }
 
         #region Final
-        public override Vector3 ReadEntityFinalTranslation(string pointerToEntity)
+        public override Vector3 ReadEntityFinalCombinedTranslation(string pointerToEntity)
         {
             if (!EntityHasTransformation(pointerToEntity))
             {
@@ -907,14 +1216,44 @@ namespace SlyMultiTrainer
 
             return _m.ReadVector3($"{pointerToEntity},{_offsetTransformationWorld},70");
         }
+
+        public override Matrix4x4 ReadEntityFinalTransformation(string pointerToEntity)
+        {
+            if (!EntityHasTransformation(pointerToEntity))
+            {
+                return Matrix4x4.Identity;
+            }
+
+            return _m.ReadMatrix4($"{pointerToEntity},{_offsetTransformationFinal},0");
+        }
+
+        public override Matrix4x4 ReadEntityFinalCombinedTransformation(string pointerToEntity)
+        {
+            if (!EntityHasTransformation(pointerToEntity))
+            {
+                return Matrix4x4.Identity;
+            }
+
+            return _m.ReadMatrix4($"{pointerToEntity},{_offsetTransformationFinal},40");
+        }
+
+        public override void WriteEntityFinalTransformation(string pointerToEntity, Matrix4x4 value)
+        {
+            if (!EntityHasTransformation(pointerToEntity))
+            {
+                return;
+            }
+
+            _m.WriteMemory($"{pointerToEntity},{_offsetTransformationFinal},0", "mat4", value.ToString());
+        }
         #endregion
 
         #endregion
 
         public List<FKXEntry_t> GetFKXList()
         {
-            int fkxCount = _m.ReadInt(FKXListCount);
-            string fkxPointer = _m.ReadInt($"{FKXListCount}+4").ToString("X");
+            int fkxCount = _m.ReadInt(FKXListCountAddress);
+            string fkxPointer = _m.ReadInt($"{FKXListCountAddress}+4").ToString("X");
             List<FKXEntry_t> fkxList = new(fkxCount);
             for (int i = 0; i < fkxCount; i++)
             {
@@ -1014,11 +1353,7 @@ namespace SlyMultiTrainer
 
         public override void WriteActCharLocalTranslation(Vector3 value)
         {
-            // int tmp = _m.ReadInt($"{ActiveCharacterPointer},D4");
-            // _m.WriteMemory($"{ActiveCharacterPointer},D4", "int", "0");
             WriteEntityLocalTranslation(ActiveCharacterPointer, value);
-            // Thread.Sleep(10);
-            // _m.WriteMemory($"{ActiveCharacterPointer},D4", "int", tmp.ToString());
         }
 
         public override void FreezeActCharLocalTranslationX(string value)
@@ -1049,6 +1384,16 @@ namespace SlyMultiTrainer
         public override void UnfreezeActCharLocalTranslationZ()
         {
             UnfreezeEntityLocalTranslationZ(ActiveCharacterPointer);
+        }
+
+        public override Vector3 ReadActCharVelocity()
+        {
+            return ReadEntityLocalVelocity(ActiveCharacterPointer);
+        }
+
+        public override void WriteActCharVelocity(Vector3 value)
+        {
+            WriteEntityLocalVelocity(ActiveCharacterPointer, value);
         }
 
         public override void FreezeActCharVelocityZ(string value)
@@ -1091,16 +1436,6 @@ namespace SlyMultiTrainer
         {
             _m.UnfreezeValue($"{ActiveCharacterPointer},{_offsetSpeedMultiplier}");
         }
-
-        public Vector3 ReadActCharVelocity()
-        {
-            return _m.ReadVector3($"{ActiveCharacterPointer},{_offsetTransformationLocal},B0");
-        }
-
-        public void WriteActCharVelocity(Vector3 value)
-        {
-            _m.WriteMemory($"{ActiveCharacterPointer},{_offsetTransformationLocal},B0", "vec3", value.ToString());
-        }
         #endregion
 
         #region Toggles
@@ -1108,12 +1443,12 @@ namespace SlyMultiTrainer
         {
             if (enableUndetectable)
             {
-                _m.FreezeValue($"{ActiveCharacterPointer},{_offsetUndetectable},1C", "int", "1");
+                _m.FreezeValue($"{ActiveCharacterPointer},{_offsetUndetectable}", "int", "1");
             }
             else
             {
-                _m.UnfreezeValue($"{ActiveCharacterPointer},{_offsetUndetectable},1C");
-                _m.WriteMemory($"{ActiveCharacterPointer},{_offsetUndetectable},1C", "int", "0");
+                _m.WriteMemory($"{ActiveCharacterPointer},{_offsetUndetectable}", "int", "0");
+                _m.UnfreezeValue($"{ActiveCharacterPointer},{_offsetUndetectable}");
             }
         }
 
@@ -1121,20 +1456,25 @@ namespace SlyMultiTrainer
         {
             if (enableInvulnerable)
             {
-                _m.FreezeValue($"{ActiveCharacterPointer},{_offsetInvulnerable}", "int", "1");
+                _lastInvulnerableValue = _m.ReadInt($"{ActiveCharacterPointer},{_offsetInvulnerable}");
+                _m.FreezeValue($"{ActiveCharacterPointer},{_offsetInvulnerable}", "int", "0");
             }
             else
             {
-                _m.UnfreezeValue($"{ActiveCharacterPointer},{_offsetInvulnerable}");
-                _m.WriteMemory($"{ActiveCharacterPointer},{_offsetInvulnerable}", "int", "0");
+                int tmp = _m.ReadInt($"{ActiveCharacterPointer},{_offsetInvulnerable}");
+                if (tmp == 0)
+                {
+                    _m.WriteMemory($"{ActiveCharacterPointer},{_offsetInvulnerable}", "int", _lastInvulnerableValue.ToString());
+                    _m.UnfreezeValue($"{ActiveCharacterPointer},{_offsetInvulnerable}");
+                }
             }
         }
 
         public override void ToggleInfiniteDbJump(bool enableInfDbJump)
         {
-            if (Region == "NTSC July 16"
-             || Region == "NTSC E3 Demo"
-             || Region == "NTSC Regular Demo")
+            if (Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCJuly16]
+             || Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoApril18]
+             || Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoJuly7])
             {
                 if (enableInfDbJump)
                 {
@@ -1144,6 +1484,7 @@ namespace SlyMultiTrainer
                 {
                     _m.UnfreezeValue($"{ActiveCharacterPointer},{_offsetInfiniteDbJump}");
                 }
+
                 return;
             }
 
@@ -1159,26 +1500,44 @@ namespace SlyMultiTrainer
             }
         }
 
-        public void ToggleDeathBarriers(bool removeDeathBarriers)
+        public override void ActCharToggleNoclip(bool enableNoclip)
         {
-            if (removeDeathBarriers)
+            // Read the comment in Sly2Handler.cs on why this pointer chain is used for collision.
+            if (enableNoclip)
             {
-                _m.FreezeValue(DeathBarriersAddress, "int", "0");
+                string value = "9";
+                if (Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoApril18]
+                 || Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoJuly7]
+                 || Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCJuly16]
+                 || Build.Region == Util.BuildRegions[Util.BUILD_NAME.PALAugust2])
+                {
+                    // Prevents warp back
+                    value = "5";
+                }
+                else if (Build.Region.Contains("PS3"))
+                {
+                    // The bits are flipped too
+                    value = "0x90";
+                }
+
+                // Usually +34 and +38 have the same value, but for murray they are different and both writes are needed for him
+                // Technically we should read the count at entity+D0, start from entity+D4, and for each entry write to +1A and increase the position by 0xD0
+                _m.WriteMemory($"{ActiveCharacterPointer},{_offsetCollision},34,1A", "byte", $"{value}");
+                _m.WriteMemory($"{ActiveCharacterPointer},{_offsetCollision},38,1A", "byte", $"{value}");
             }
             else
             {
-                _m.UnfreezeValue(DeathBarriersAddress);
-                _m.WriteMemory(DeathBarriersAddress, "int", "0x0901F0FF");
+                _m.WriteMemory($"{ActiveCharacterPointer},{_offsetCollision},34,1A", "byte", "0");
+                _m.WriteMemory($"{ActiveCharacterPointer},{_offsetCollision},38,1A", "byte", "0");
             }
         }
-
         #endregion
 
         #region Maps
         public override void LoadMap(int mapId)
         {
             byte[] data = _m.ReadBytes($"{ReloadValuesAddress}+{mapId * 0x40:X8}", 0x40);
-            _m.WriteBytes($"{ReloadAddress}+8", data);
+            _m.WriteMemory($"{ReloadAddress}+8", "bytes", Memory.EndianBitConverter.ByteArrayToString(data));
             ReloadMap();
         }
 
@@ -1206,6 +1565,96 @@ namespace SlyMultiTrainer
         }
         #endregion
 
+        public override void SkipCurrentDialogue()
+        {
+            // NOTE: This code is repeated in Sly 2 too
+            int objVoiceover = _m.ReadInt(DialoguePointer);
+            if (objVoiceover == 0)
+            {
+                // Skip FMV
+                if (Build.Region.Contains("PS3"))
+                {
+                    _m.WriteMemory($"{SkipFMVPointer}", "int", "1");
+                }
+                else
+                {
+                    var IsFMVPlaying = _m.ReadInt($"{SkipFMVPointer},8");
+                    if (IsFMVPlaying == 2)
+                    {
+                        _m.WriteMemory($"{SkipFMVPointer},0", "int", "1");
+                    }
+                }
+
+                return;
+            }
+
+            // Don't do anything if the voice line was triggered from splice (e.g. sly 3 ep1 police hq when carmelita is talking)
+            // NOTE: The sourceObject field might still be 0 even if the voice line was triggered from splice (e.g. sly 2 ep8 showdown with clock-la, while sly is in air)
+            int sourceObject = _m.ReadInt($"{objVoiceover + 0x1C:X}");
+            if (sourceObject != 0)
+            {
+                return;
+            }
+
+            // The following logic comes from 001E4120 in Sly 2 NTSC, which is a function responsible in the seq(uence) cutscenes
+            // to check if the code should return to the main loop or execute the next seq instruction
+            // The seq instruction 0x45 (play a voice line) will compare its string id argument with the current voice line id
+            // If the current voice line id is -1, or is different than the seq instruction's argument, it will go to the next seq instruction
+            int offsetStringId = 0x40;
+            int stringIdAddress = _m.ReadInt($"{objVoiceover:X}+{_offsetCurrentDialogue}") + offsetStringId;
+            int stringId = _m.ReadInt($"{stringIdAddress:X}");
+            if (stringId == -1)
+            {
+                // Trying to skip an already skipped voice line
+                // Or voice line is still playing but no dialogue is on the screen (the cutscene has ended, the player has control)
+                //System.Diagnostics.Debug.WriteLine($"Trying to skip an already skipped voice line?");
+                return;
+            }
+
+            //System.Diagnostics.Debug.WriteLine($"Skipping {stringId:X} at address {stringIdAddress:X} (start at {stringIdAddress - offsetStringId:X}) ({GetStringFromId(stringId)})");
+            int write = -1;
+            _m.WriteMemory($"{stringIdAddress:X}", "int", write.ToString());
+
+            // While writing 8 (technically tmp = (tmp & ~0x1fff) | 0x8) to _offsetDialogueFlags
+            // does skip the voice line, it's buggy and the game can get softlocked if we skip voice lines too quickly
+            // We keep doing this write so that the character's lip animation gets skipped too
+            _m.WriteMemory($"{objVoiceover:X}+{_offsetDialogueFlags}", "byte", "8");
+
+            // Sly 3 has the ability to "soft" reload the map and make the same voice line play again
+            // (especially because we can load a checkpoint with zero focus through the DAG)
+            // so we need to restore the original string id
+            // Restore the string id when the next voice line starts or when the cutscene ends
+            Task.Run(async () =>
+            {
+                while (true)
+                {
+                    await Task.Delay(500);
+                    //System.Diagnostics.Debug.WriteLine($"Trying to restore {stringId:X} at address {stringIdAddress:X} (start at {stringIdAddress - offsetStringId:X}) ({GetStringFromId(stringId)})");
+                    int objVoiceoverNew = _m.ReadInt(DialoguePointer);
+                    if (objVoiceoverNew != 0)
+                    {
+                        int stringIdAddressNew = _m.ReadInt($"{objVoiceoverNew:X}+{_offsetCurrentDialogue}") + offsetStringId;
+                        if (stringIdAddress == stringIdAddressNew)
+                        {
+                            // Still in the same voice line (e.g. waiting for a camera transition)
+                            continue;
+                        }
+                    }
+
+                    // New voice line started or cutscene ended
+                    // Only restore if the string id is still our value (it's not if we changed map or we loaded a savestate)
+                    int stringIdNew = _m.ReadInt($"{stringIdAddress:X}");
+                    if (stringIdNew == write)
+                    {
+                        //System.Diagnostics.Debug.WriteLine($"Restoring {stringId:X} at address {stringIdAddress:X} (start at {stringIdAddress - offsetStringId:X}) ({GetStringFromId(stringId)})");
+                        _m.WriteMemory($"{stringIdAddress:X}", "int", stringId.ToString());
+                    }
+
+                    break;
+                }
+            });
+        }
+
         public string GetStringFromId(int id)
         {
             if (id == -1)
@@ -1231,10 +1680,9 @@ namespace SlyMultiTrainer
 
         public List<(int id, string str)> GetStringTable(bool ordered)
         {
+            string address = _m.ReadInt($"{StringTableCountAddress}+4").ToString("X");
             int count = _m.ReadInt($"{StringTableCountAddress}");
             List<(int id, string str)> table = new(count);
-
-            string address = _m.ReadInt($"{StringTableCountAddress}+4").ToString("X");
             for (int i = 0; i < count; i++)
             {
                 int stringId = _m.ReadInt($"{address}+{i * 8:X}");
@@ -1250,11 +1698,6 @@ namespace SlyMultiTrainer
             }
 
             return table;
-        }
-
-        public override Controller_t GetController()
-        {
-            return new(_m, $"{ActiveCharacterPointer},{_offsetController},{_offsetControllerBinds}");
         }
 
         protected override List<Character_t> GetCharacters()
@@ -1273,55 +1716,215 @@ namespace SlyMultiTrainer
             };
         }
 
+        protected override List<Warp_t> GetEntranceLocations()
+        {
+            List<(int id, Warp_t warp)> entrances = new();
+            string entrance = _m.ReadInt(EntranceRootNodePointer).ToString("X");
+
+            string splicePointerOffset = "0";
+            if (Build.Region.Contains("PS3"))
+            {
+                splicePointerOffset = "4";
+            }
+
+            while (entrance != "0")
+            {
+                int id = _m.ReadInt($"{entrance}+18");
+                Matrix4x4 trans = _m.ReadMatrix4($"{entrance}+{_offsetEntranceTransformation}");
+                string str = $"Entrance {id:X} [{entrance:X}]";
+                int splicePointer = _m.ReadInt($"{entrance}+{splicePointerOffset}");
+                if (splicePointer != 0)
+                {
+                    str += " (Splice)";
+                }
+
+                entrances.Add(new(id, new(str, trans)));
+                entrance = _m.ReadInt($"{entrance}+20").ToString("X");
+            }
+
+            return entrances.OrderBy(e => e.id).Select(e => e.warp).ToList();
+        }
+
+        private enum GADGET_NAME
+        {
+            SmokeBomb,
+            CombatDodge,
+            Paraglide,
+            SilentObliteration,
+            FeralPounce,
+            MegaJump,
+            KnockoutDive,
+            ShadowPowerLevel1,
+            ThiefReflexes,
+            ShadowPowerLevel2,
+            RocketBoots,
+            TreasureMap,
+            Shield,
+            VeniceDisguise,
+            PhotographerDisguise,
+            PirateDisguise,
+            SpinAttackLevel1,
+            SpinAttackLevel2,
+            SpinAttackLevel3,
+            JumpAttackLevel1,
+            JumpAttackLevel2,
+            JumpAttackLevel3,
+            PushAttackLevel1,
+            PushAttackLevel2,
+            PushAttackLevel3,
+
+            TriggerBomb,
+            FishingPole,
+            AlarmClock,
+            AdrenalineBurst,
+            HealthExtractor,
+            HoverPack,
+            InsanityStrike,
+            GrappleCam,
+            SizeDestabilizer,
+            RageBomb,
+            ReductionBomb,
+
+            BeTheBall,
+            BerserkerCharge,
+            JuggernautThrow,
+            GutturalRoar,
+            FistsOfFlame,
+            TemporalLock,
+            RagingInfernoFlop,
+            DiabloFireSlam,
+
+            UnknownRocketBoots,
+            VoltageAttack,
+            MusicBox,
+            TimeRush,
+            PopeDisguise,
+            Cube,
+            SnoozeBomb,
+            TurnbuckleLaunch,
+            ButterflyNet,
+            CutscenePuppet,
+        }
+
+        private static Dictionary<GADGET_NAME, string> _gadgetNames = new()
+        {
+            [GADGET_NAME.SmokeBomb] = "Smoke Bomb",
+            [GADGET_NAME.CombatDodge] = "Combat Dodge",
+            [GADGET_NAME.Paraglide] = "Paraglide",
+            [GADGET_NAME.SilentObliteration] = "Silent Obliteration",
+            [GADGET_NAME.FeralPounce] = "Feral Pounce",
+            [GADGET_NAME.MegaJump] = "Mega Jump",
+            [GADGET_NAME.KnockoutDive] = "Knockout Dive",
+            [GADGET_NAME.ShadowPowerLevel1] = "Shadow Power Level 1",
+            [GADGET_NAME.ThiefReflexes] = "Thief Reflexes",
+            [GADGET_NAME.ShadowPowerLevel2] = "Shadow Power Level 2",
+            [GADGET_NAME.RocketBoots] = "Rocket Boots",
+            [GADGET_NAME.TreasureMap] = "Treasure Map",
+            [GADGET_NAME.Shield] = "Shield",
+            [GADGET_NAME.VeniceDisguise] = "Venice Disguise",
+            [GADGET_NAME.PhotographerDisguise] = "Photographer Disguise",
+            [GADGET_NAME.PirateDisguise] = "Pirate Disguise",
+            [GADGET_NAME.SpinAttackLevel1] = "Spin Attack Level 1",
+            [GADGET_NAME.SpinAttackLevel2] = "Spin Attack Level 2",
+            [GADGET_NAME.SpinAttackLevel3] = "Spin Attack Level 3",
+            [GADGET_NAME.JumpAttackLevel1] = "Jump Attack Level 1",
+            [GADGET_NAME.JumpAttackLevel2] = "Jump Attack Level 2",
+            [GADGET_NAME.JumpAttackLevel3] = "Jump Attack Level 3",
+            [GADGET_NAME.PushAttackLevel1] = "Push Attack Level 1",
+            [GADGET_NAME.PushAttackLevel2] = "Push Attack Level 2",
+            [GADGET_NAME.PushAttackLevel3] = "Push Attack Level 3",
+
+            [GADGET_NAME.TriggerBomb] = "Trigger Bomb",
+            [GADGET_NAME.FishingPole] = "Fishing Pole",
+            [GADGET_NAME.AlarmClock] = "Alarm Clock",
+            [GADGET_NAME.AdrenalineBurst] = "Adrenaline Burst",
+            [GADGET_NAME.HealthExtractor] = "Health Extractor",
+            [GADGET_NAME.HoverPack] = "Hover Pack",
+            [GADGET_NAME.InsanityStrike] = "Insanity Strike",
+            [GADGET_NAME.GrappleCam] = "Grapple-Cam",
+            [GADGET_NAME.SizeDestabilizer] = "Size Destabilizer",
+            [GADGET_NAME.RageBomb] = "Rage Bomb",
+            [GADGET_NAME.ReductionBomb] = "Reduction Bomb",
+
+            [GADGET_NAME.BeTheBall] = "Be The Ball",
+            [GADGET_NAME.BerserkerCharge] = "Berserker Charge",
+            [GADGET_NAME.JuggernautThrow] = "Juggernaut Throw",
+            [GADGET_NAME.GutturalRoar] = "Guttural Roar",
+            [GADGET_NAME.FistsOfFlame] = "Fists of Flame",
+            [GADGET_NAME.TemporalLock] = "Temporal Lock",
+            [GADGET_NAME.RagingInfernoFlop] = "Raging Inferno Flop",
+            [GADGET_NAME.DiabloFireSlam] = "Diablo Fire Slam",
+
+            [GADGET_NAME.UnknownRocketBoots] = "Unknown Rocket Boots",
+            [GADGET_NAME.VoltageAttack] = "Voltage Attack",
+            [GADGET_NAME.MusicBox] = "Music Box",
+            [GADGET_NAME.TimeRush] = "Time Rush",
+            [GADGET_NAME.PopeDisguise] = "Pope Disguise",
+            [GADGET_NAME.Cube] = "Cube",
+            [GADGET_NAME.SnoozeBomb] = "Snooze Bomb",
+            [GADGET_NAME.TurnbuckleLaunch] = "Turnbuckle Launch",
+            [GADGET_NAME.ButterflyNet] = "Butterfly Net",
+            [GADGET_NAME.CutscenePuppet] = "Cutscene Puppet",
+        };
+
         protected override List<List<Gadget_t>> GetGadgets()
         {
             return new()
             {
                 new()
                 {
-                    new("Smoke Bomb", 0x19),
-                    new("Combat Dodge", 0x1A),
-                    new("Paraglide", 0x1B),
-                    new("Silent Obliteration", 0x1C),
-                    new("Feral Pounce", 0x1D),
-                    new("Mega Jump", 0x1E),
-                    new("Knockout Dive", 0x1F),
-                    new("Shadow Power Level 1", 0x20),
-                    new("Thief Reflexes", 0x21),
-                    new("Shadow Power Level 2", 0x22),
-                    new("Rocket Boots", 0x23),
-                    new("Treasure Map", 0x24),
-                    new("Shield", 0x25),
-                    new("Venice Disguise", 0x26),
-                    new("Photographer Disguise", 0x27),
-                    new("Pirate Disguise", 0x28),
+                    new(_gadgetNames[GADGET_NAME.SmokeBomb], 0x19),
+                    new(_gadgetNames[GADGET_NAME.CombatDodge], 0x1A),
+                    new(_gadgetNames[GADGET_NAME.Paraglide], 0x1B),
+                    new(_gadgetNames[GADGET_NAME.SilentObliteration], 0x1C),
+                    new(_gadgetNames[GADGET_NAME.FeralPounce], 0x1D),
+                    new(_gadgetNames[GADGET_NAME.MegaJump], 0x1E),
+                    new(_gadgetNames[GADGET_NAME.KnockoutDive], 0x1F),
+                    new(_gadgetNames[GADGET_NAME.ShadowPowerLevel1], 0x20),
+                    new(_gadgetNames[GADGET_NAME.ThiefReflexes], 0x21),
+                    new(_gadgetNames[GADGET_NAME.ShadowPowerLevel2], 0x22),
+                    new(_gadgetNames[GADGET_NAME.RocketBoots], 0x23),
+                    new(_gadgetNames[GADGET_NAME.TreasureMap], 0x24),
+                    new(_gadgetNames[GADGET_NAME.Shield], 0x25),
+                    new(_gadgetNames[GADGET_NAME.VeniceDisguise], 0x26),
+                    new(_gadgetNames[GADGET_NAME.PhotographerDisguise], 0x27),
+                    new(_gadgetNames[GADGET_NAME.PirateDisguise], 0x28),
+                    new(_gadgetNames[GADGET_NAME.SpinAttackLevel1], 0x29, false),
+                    new(_gadgetNames[GADGET_NAME.SpinAttackLevel2], 0x2A, false),
+                    new(_gadgetNames[GADGET_NAME.SpinAttackLevel3], 0x2B, false),
+                    new(_gadgetNames[GADGET_NAME.JumpAttackLevel1], 0x2C, false),
+                    new(_gadgetNames[GADGET_NAME.JumpAttackLevel2], 0x2D, false),
+                    new(_gadgetNames[GADGET_NAME.JumpAttackLevel3], 0x2E, false),
+                    new(_gadgetNames[GADGET_NAME.PushAttackLevel1], 0x2F, false),
+                    new(_gadgetNames[GADGET_NAME.PushAttackLevel2], 0x30, false),
+                    new(_gadgetNames[GADGET_NAME.PushAttackLevel3], 0x31, false),
                 },
 
                 new()
                 {
-                    new("Trigger Bomb", 0x6),
-                    new("Fishing Pole", 0x7),
-                    new("Alarm Clock", 0x8),
-                    new("Adrenaline Burst", 0x9),
-                    new("Health Extractor", 0xA),
-                    new("Hover Pack", 0xB),
-                    new("Insanity Strike", 0xC),
-                    new("Grapple-Cam", 0xD),
-                    new("Size Destabilizer", 0xE),
-                    new("Rage Bomb", 0xF),
-                    new("Reduction Bomb", 0x10),
+                    new(_gadgetNames[GADGET_NAME.TriggerBomb], 0x6),
+                    new(_gadgetNames[GADGET_NAME.FishingPole], 0x7),
+                    new(_gadgetNames[GADGET_NAME.AlarmClock], 0x8),
+                    new(_gadgetNames[GADGET_NAME.AdrenalineBurst], 0x9),
+                    new(_gadgetNames[GADGET_NAME.HealthExtractor], 0xA),
+                    new(_gadgetNames[GADGET_NAME.HoverPack], 0xB),
+                    new(_gadgetNames[GADGET_NAME.InsanityStrike], 0xC),
+                    new(_gadgetNames[GADGET_NAME.GrappleCam], 0xD),
+                    new(_gadgetNames[GADGET_NAME.SizeDestabilizer], 0xE),
+                    new(_gadgetNames[GADGET_NAME.RageBomb], 0xF),
+                    new(_gadgetNames[GADGET_NAME.ReductionBomb], 0x10),
                 },
 
                 new()
                 {
-                    new("Be The Ball", 0x11),
-                    new("Berserker Charge", 0x12),
-                    new("Juggernaut Throw", 0x13),
-                    new("Guttural Roar", 0x14),
-                    new("Fists of Flame", 0x15),
-                    new("Temporal Lock", 0x16),
-                    new("Raging Inferno Flop", 0x17),
-                    new("Diablo Fire Slam", 0x18),
+                    new(_gadgetNames[GADGET_NAME.BeTheBall], 0x11),
+                    new(_gadgetNames[GADGET_NAME.BerserkerCharge], 0x12),
+                    new(_gadgetNames[GADGET_NAME.JuggernautThrow], 0x13),
+                    new(_gadgetNames[GADGET_NAME.GutturalRoar], 0x14),
+                    new(_gadgetNames[GADGET_NAME.FistsOfFlame], 0x15),
+                    new(_gadgetNames[GADGET_NAME.TemporalLock], 0x16),
+                    new(_gadgetNames[GADGET_NAME.RagingInfernoFlop], 0x17),
+                    new(_gadgetNames[GADGET_NAME.DiabloFireSlam], 0x18),
                 },
             };
         }
@@ -1330,7 +1933,7 @@ namespace SlyMultiTrainer
         {
             return new()
             {
-                new("DVD Menu",
+                new("DVD menu",
                     new()
                     {
                         new(),
@@ -1343,348 +1946,349 @@ namespace SlyMultiTrainer
                     },
                     false
                 ),
-                new("Hazard Room",
+                new("Hazard room",
                     new()
                     {
-                        new("Center", new(3550, 440, 150)),
-                        new("Top", new(3580, 630, 3600)),
-                        new("Safehouse", new(6640, 680, 150)),
+                        new("Center", 3550, 440, 150),
+                        new("Top", 3580, 630, 3600),
+                        new("Safehouse", 6640, 680, 150),
                     }
                 ),
-                new("Venice Hub",
+                new("Venice hub",
                     new()
                     {
-                        new("Safehouse", new(200, -2090, 273)),
-                        new("Safehouse (Top)", new(863, -1420, 1366)),
-                        new("Police HQ", new(-7570, 1670, 2062)),
-                        new("Ferris Wheel", new(6900, 1480, 260)),
-                        new("Stage", new(6250, 8210, 360)),
-                        new("Fountain", new(-6670, 8550, 800)),
-                        new("Aquarium", new(8040, -4365, 260)),
+                        new("Safehouse", 200, -2090, 273),
+                        new("Safehouse (top)", 863, -1420, 1366),
+                        new("Police HQ", -7570, 1670, 2062),
+                        new("Ferris wheel", 6900, 1480, 260),
+                        new("Stage", 6250, 8210, 360),
+                        new("Fountain", -6670, 8550, 800),
+                        new("Aquarium", 8040, -4365, 260),
+                        new("Opera house (top)", 10100, 10100, 4500),
                     }
                 ),
-                new($"{SubMapNamePrefix}Canal Chase",
+                new($"{SubMapNamePrefix}Canal chase",
                     new()
                     {
-                        new("Boat", new(0, 0, 230)),
-                        new("Intersection 1", new(665, -12555, 240)),
-                        new("Intersection 2", new(27250, 28580, 240)),
+                        new("Boat", 0, 0, 230),
+                        new("Intersection 1", 665, -12555, 240),
+                        new("Intersection 2", 27250, 28580, 240),
                     }
                 ),
-                new($"{SubMapNamePrefix}Coffeehouses",
+                new($"{SubMapNamePrefix}Coffee houses",
                     new()
                     {
-                        new("Entrance 1", new(710, -5000, 225)),
-                        new("Entrance 2", new(1070, 100, 225)),
-                        new("Entrance 3", new(1160, 5000, 225)),
-                        new("Safe 1", new(-1710, -4990, 225)),
-                        new("Safe 2", new(-1750, 10, 225)),
-                        new("Safe 3", new(-3245, 4990, 225)),
-                        new("Roof", new(-1780, -4540, 1275)),
+                        new("Door 1", 710, -5000, 225),
+                        new("Door 2", 1070, 100, 225),
+                        new("Door 3", 1160, 5000, 225),
+                        new("Safe 1", -1710, -4990, 225),
+                        new("Safe 2", -1750, 10, 225),
+                        new("Safe 3", -3245, 4990, 225),
+                        new("Roof", -1780, -4540, 1275),
                     }
                 ),
-                new($"{SubMapNamePrefix}Gauntlet / Opera House",
+                new($"{SubMapNamePrefix}Gauntlet / Opera house",
                     new()
                     {
-                        new("Main Entrance", new(-7130, -11340, 1130)),
-                        new("Basement Entrance", new(14440, -4000, 1115)),
-                        new("Pump Room", new(-885, -2230, 280)),
-                        new("Worlitzer-700", new(-2100, 4890, 730)),
-                        new("Underground Canal", new(8720, -6490, 175)),
-                        new("Overlook", new(8770, -5830, 1750)),
+                        new("Main door", -7130, -11340, 1130),
+                        new("Basement door", 14440, -4000, 1115),
+                        new("Pump room", -885, -2230, 280),
+                        new("Worlitzer-700", -2100, 4890, 730),
+                        new("Underground canal", 8720, -6490, 175),
+                        new("Overlook", 8770, -5830, 1750),
                     }
                 ),
-                new($"{SubMapNamePrefix}Police Station",
+                new($"{SubMapNamePrefix}Police station",
                     new()
                     {
-                        new("Dimitri's Cell", new(-60, 7600, 220)),
-                        new("Cell Key", new(-685, 3250, 225)),
+                        new("Dimitri's cell", -60, 7600, 220),
+                        new("Cell key", -685, 3250, 225),
                     }
                 ),
-                new("Outback Hub",
+                new("Outback hub",
                     new()
                     {
-                        new("Safehouse", new(-4570, -7190, 1625)),
-                        new("Safehouse (Top)", new(-4590, -7820, 2750)),
-                        new("Crane", new(-700, -1290, 4420)),
-                        new("Truck", new(9820, -550, 1340)),
-                        new("Guru's Hut", new(-8230, 4365, 2860)),
-                        new("Guru's Cell", new(8665, 5620, 2920)),
-                        new("Treeline", new(-8360, -3400, 5160)),
-                        new("Plateau", new(6360, 7645, 7030)),
+                        new("Safehouse", -4570, -7190, 1625),
+                        new("Safehouse (top)", -4590, -7820, 2750),
+                        new("Crane", -700, -1290, 4420),
+                        new("Truck", 9820, -550, 1340),
+                        new("Guru's hut", -8230, 4365, 2860),
+                        new("Guru's cell", 8665, 5620, 2920),
+                        new("Treeline", -8360, -3400, 5160),
+                        new("Plateau", 6360, 7645, 7030),
                     }
                 ),
-                new($"{SubMapNamePrefix}Quarry / Ayers Rock",
+                new($"{SubMapNamePrefix}Ayers Rock",
                     new()
                     {
-                        new("Drill Controls", new(270, 160, 340)),
-                        new("Drill Controls (Top)", new(420, 15, 2290)),
-                        new("Truck Spawn", new(-16350, 8310, 4330)),
-                        new("Mine Entrance", new(3830, 13920, 170)),
-                        new("Clifftop", new(16260, 12890, 12760)),
+                        new("Drill controls", 270, 160, 340),
+                        new("Drill controls (top)", 420, 15, 2290),
+                        new("Truck spawn", -16350, 8310, 4330),
+                        new("Big door", 3830, 13920, 170),
+                        new("Clifftop", 16260, 12890, 12760),
                     }
                 ),
-                new($"{SubMapNamePrefix}Oil Field",
+                new($"{SubMapNamePrefix}Oil field",
                     new()
                     {
-                        new("The Claw", new(320, 10000, 170)),
-                        new("Catapult", new(4820, -4470, 170)),
-                        new("Drill Platform", new(-360, 620, 1335)),
+                        new("The claw", 320, 10000, 170),
+                        new("Catapult", 4820, -4470, 170),
+                        new("Drill platform", -360, 620, 1335),
                     }
                 ),
                 new($"{SubMapNamePrefix}Cave 1 (Sly)",
                     new()
                     {
-                        new("Entrance", new(-9345, 330, 120)),
-                        new("Safe", new(6545, 125, 1211)),
-                        new("Drills", new(-780, -3420, 1220)),
+                        new("Door", -9345, 330, 120),
+                        new("Safe", 6545, 125, 1211),
+                        new("Drills", -780, -3420, 1220),
                     }
                 ),
                 new($"{SubMapNamePrefix}Cave 2 (Guru)",
                     new()
                     {
-                        new("Entrance", new(-8945, 370, -1760)),
-                        new("Safe", new(-100, -4960, -510)),
-                        new("Hook Conveyor Belt", new(-5970, -1800, -1235)),
+                        new("Door", -8945, 370, -1760),
+                        new("Safe", -100, -4960, -510),
+                        new("Hook conveyor belt", -5970, -1800, -1235),
                     }
                 ),
                 new($"{SubMapNamePrefix}Bar",
                     new()
                     {
-                        new(),
+                        new("Spawn", 0, 500, 200),
                     }
                 ),
                 new($"{SubMapNamePrefix}Cave 3 (Murray)",
                     new()
                     {
-                        new("Entrance", new(-10230, -1445, -1040)),
-                        new("Piston", new(3380, -1870, -920)),
-                        new("Triple Piston", new(-2300, -8000, 250)),
+                        new("Door", -10230, -1445, -1040),
+                        new("Piston", 3380, -1870, -920),
+                        new("Triple piston", -2300, -8000, 250),
                     }
                 ),
-                new("Holland Hub",
+                new("Holland hub",
                     new()
                     {
-                        new("Safehouse", new(12180, -540, 1280)),
-                        new("Baron's Hangar", new(-6015, 6880, 2855)),
-                        new("Forest", new(-2770, 3020, 530)),
-                        new("Ramp", new(-4645, -9100, 1780)),
-                        new("Barn", new(3680, -6000, 700)),
+                        new("Safehouse", 12180, -540, 1280),
+                        new("Baron's hangar", -6015, 6880, 2855),
+                        new("Forest", -2770, 3020, 530),
+                        new("Ramp", -4645, -9100, 1780),
+                        new("Barn", 3680, -6000, 700),
                     }
                 ),
                 new($"{SubMapNamePrefix}Hotel",
                     new()
                     {
-                        new("Safehouse Entrance", new(2620, 280, 700)),
-                        new("Ham", new(-535, 420, 100)),
-                        new("Viking Helmet", new(830, 2950, 690)),
-                        new("Outside", new(60, -6590, -445)),
+                        new("Top floor", 2620, 280, 700),
+                        new("Ham", -535, 420, 100),
+                        new("Viking helmet", 830, 2950, 690),
+                        new("Outside", 60, -6590, -445),
                     }
                 ),
                 new($"{SubMapNamePrefix}Hangar (team Belgium)",
                     new()
                     {
-                        new(),
+                        new("Spawn", 0, 0, 150),
                     }
                 ),
                 new($"{SubMapNamePrefix}Hangar (team Black Baron)",
                     new()
                     {
-                        new(),
+                        new("Spawn", 0, 600, 150),
                     }
                 ),
                 new($"{SubMapNamePrefix}Hangar (team Cooper)",
                     new()
                     {
-                        new("Center", new(-180, -125, 175)),
-                        new("Control Room", new(-1890, -130, 175)),
-                        new("Truck", new(-340, 2220, 1130)),
+                        new("Center", -180, -125, 175),
+                        new("Control room", -1890, -130, 175),
+                        new("Truck", -340, 2220, 1130),
                     }
                 ),
                 new($"{SubMapNamePrefix}Sewers",
                     new()
                     {
-                        new("Entrance", new(20150, -9850, 310)),
-                        new("Iceland Hotel Path", new(16490, 7280, 310)),
-                        new("Exit to Surface", new(7960, -12750, 310)),
-                        new("Iceland Hotel Entrance", new(7425, 9500, 310)),
-                        new("Platform", new(200, 0, 200)),
+                        new("Ladder from hub", 20150, -9850, 310),
+                        new("Path to hotel", 16490, 7280, 310),
+                        new("Ladder to hotel", 7425, 9500, 310),
+                        new("Ladder to hub", 7960, -12750, 310),
+                        new("Platform", 200, 0, 200),
                     }
                 ),
-                new($"{SubMapNamePrefix}Dogfight / Biplane Battlefield",
+                new($"{SubMapNamePrefix}Biplane battlefield",
                     new()
                     {
-                        new("Barn", new(-1890, 380, 970)),
-                        new("Crop Squares", new(17800, 3210, 1000)),
-                        new("Bridge 1", new(-140, -14670, 720)),
-                        new("Bridge 2", new(-4444, 16170, 550)),
-                        new("Bridge 3", new(10460, 13260, 600)),
-                        new("Plane", new(251764, -186, 100)),
+                        new("Barn", -1890, 380, 970),
+                        new("Crop squares", 17800, 3210, 1000),
+                        new("Bridge 1", -140, -14670, 720),
+                        new("Bridge 2", -4444, 16170, 550),
+                        new("Bridge 3", 10460, 13260, 600),
+                        new("Plane", 251764, -186, 100),
                     }
                 ),
-                new("Two Player Hackathon",
+                new($"{SubMapNamePrefix}Two Player Hackathon",
                     new()
                     {
                         new(),
                     }
                 ),
-                new("China Hub",
+                new("China hub",
                     new()
                     {
-                        new("Safehouse", new(-5440, -7500, 2120)),
-                        new("Turret Tower", new(-5330, -8415, 3600)),
-                        new("Walk Across the Heavens", new(7310, -8370, 5080)),
-                        new("Graveyard", new(8570, 10150, 5940)),
-                        new("Statue", new(795, -2980, 2015)),
-                        new("Palace", new(940, 2255, 4890)),
+                        new("Safehouse", -5440, -7500, 2120),
+                        new("Turret tower", -5330, -8415, 3600),
+                        new("Walk across the heavens", 7310, -8370, 5080),
+                        new("Graveyard", 8570, 10150, 5940),
+                        new("Statue", 795, -2980, 2015),
+                        new("Palace", 940, 2255, 4890),
                     }
                 ),
                 new($"{SubMapNamePrefix}Intro",
                     new()
                     {
-                        new("Entrance", new(-2085, -54630, 950)),
-                        new("Panda King's Perch", new(400, -50485, 1988)),
-                        new("House", new(3470, -51845, 920)),
-                        new("Clifftop", new(-2820, -57675, 5520)),
+                        new("Passage", -2085, -54630, 950),
+                        new("Panda King's perch", 400, -50485, 1988),
+                        new("House", 3470, -51845, 920),
+                        new("Clifftop", -2820, -57675, 5520),
                     }
                 ),
-                new($"{SubMapNamePrefix}Panda King's Flashback",
+                new($"{SubMapNamePrefix}Panda King's flashback",
                     new()
                     {
-                        new(),
+                        new("Spawn", -2513, 0, -200),
                     }
                 ),
-                new($"{SubMapNamePrefix}Tsao's Battleground",
+                new($"{SubMapNamePrefix}Tsao's battleground",
                     new()
                     {
-                        new("Top", new(-50, 3060, 840)),
-                        new("Bottom", new(130, 30410, 150)),
-                        new("Overlook", new(-4545, 35970, 4775)),
+                        new("Top", -50, 3060, 840),
+                        new("Bottom", 130, 30410, 150),
+                        new("Overlook", -4545, 35970, 4775),
                     }
                 ),
-                new($"{SubMapNamePrefix}Panda King's House",
+                new($"{SubMapNamePrefix}Panda King's house",
                     new()
                     {
-                        new("Yang", new(-240, -100, 20095)),
-                        new("Yin", new(-1855, -100, 20095)),
+                        new("Yin", -1855, -100, 20095),
+                        new("Yang", -240, -100, 20095),
                     }
                 ),
-                new($"{SubMapNamePrefix}Tsao's Business Center",
+                new($"{SubMapNamePrefix}Tsao's business center",
                     new()
                     {
-                        new("Entrance", new(-3200, 0, 100)),
-                        new("Second Floor", new(1050, 1580, 800)),
-                        new("Computer", new(1075, -1515, 800)),
-                        new("Outside", new(-4210, -140, 0)),
-                        new("Overlook", new(-10480, -4100, 2900)),
+                        new("Door", -3200, 0, 100),
+                        new("Second floor", 1050, 1580, 800),
+                        new("Computer", 1075, -1515, 800),
+                        new("Outside", -4210, -140, 0),
+                        new("Overlook", -10480, -4100, 2900),
                     }
                 ),
                 new($"{SubMapNamePrefix}Palace",
                     new()
                     {
-                        new("Vases", new(-5270, -60, -50)),
-                        new("Computer", new(-2250, 1445, 150)),
-                        new("Jing King's Room", new(470, -1500, 150)),
-                        new("Drill Site", new(2075, 15000, 700)),
+                        new("Vases", -5270, -60, -50),
+                        new("Computer", -2250, 1445, 150),
+                        new("Jing King's room", 470, -1500, 150),
+                        new("Drill site", 2075, 15000, 700),
                     }
                 ),
-                new($"{SubMapNamePrefix}Treasure Temple",
+                new($"{SubMapNamePrefix}Treasure temple",
                     new()
                     {
-                        new("Entrance", new(-6300, -130, 500)),
-                        new("Treasure Area", new(1725, 730, -200)),
-                        new("Crawlspace", new(-560, 140, 1800)),
+                        new("Door", -6300, -130, 500),
+                        new("Treasure area", 1725, 730, -200),
+                        new("Crawlspace", -560, 140, 1800),
                     }
                 ),
-                new("Pirate Hub",
+                new("Pirate hub",
                     new()
                     {
-                        new("Safehouse", new(4900, 1345, 1225)),
-                        new("Safehouse (Top)", new(5590, 2310, 2780)),
-                        new("Skull Keep (Top)", new(-9600, -1880, 4510)),
-                        new("Waterfall (Top)", new(3625, 16360, 4535)),
-                        new("Fireplace", new(-530, 7030, 2070)),
-                        new("Monkeys?", new(-7415, 11565, 1620)),
-                        new("Cooper Gang Ship", new(11390, -9290, 1650)),
-                        new("Archipelago", new(-26550, -19930, 2200)),
+                        new("Safehouse", 4900, 1345, 1225),
+                        new("Safehouse (top)", 5590, 2310, 2780),
+                        new("Skull keep (top)", -9600, -1880, 4510),
+                        new("Waterfall (top)", 3625, 16360, 4535),
+                        new("Fireplace", -530, 7030, 2070),
+                        new("Monkeys?", -7415, 11565, 1620),
+                        new("Cooper gang ship", 11390, -9290, 1650),
+                        new("Archipelago", -26550, -19930, 2200),
                     }
                 ),
-                new($"{SubMapNamePrefix}Sailing Map",
+                new($"{SubMapNamePrefix}Sailing map",
                     new()
                     {
                         new(),
                     }
                 ),
-                new($"{SubMapNamePrefix}Underwater Shipwreck",
+                new($"{SubMapNamePrefix}Underwater shipwreck",
                     new()
                     {
-                        new("Spawn", new(28980, -100, 2800)),
-                        new("Ship (Top)", new(21020, 14180, 6030)),
-                        new("Shipwreck", new(22460, 12380, -3280)),
-                        new("Depths", new(21910, 8690, -7085)),
-                        new("Ocean Current", new(20860, 22410, -6920)),
+                        new("Spawn", 28980, -100, 2800),
+                        new("Ship (top)", 21020, 14180, 6030),
+                        new("Shipwreck", 22460, 12380, -3280),
+                        new("Depths", 21910, 8690, -7085),
+                        new("Ocean current", 20860, 22410, -6920),
 
                     }
                 ),
-                new($"{SubMapNamePrefix}Dagger Island",
+                new($"{SubMapNamePrefix}Dagger island",
                     new()
                     {
-                        new("Cooper Gang Ship", new(-16760, 2940, 1000)),
-                        new("Palm Tree Circle", new(-8040, -970, 1200)),
-                        new("Flipped Ship", new(1620, -5250, 1240)),
-                        new("Pirate Ship", new(15680, 5290, 870)),
-                        new("Mountain Peak", new(2215, 10860, 8040)),
+                        new("Cooper gang ship", -16760, 2940, 1000),
+                        new("Palm tree circle", -8040, -970, 1200),
+                        new("Flipped ship", 1620, -5250, 1240),
+                        new("Pirate ship", 15680, 5290, 870),
+                        new("Mountain peak", 2215, 10860, 8040),
                     }
                 ),
-                new("Kaine Island",
+                new("Kaine island",
                     new()
                     {
-                        new("Spawn", new(-6715, -14380, -2800)),
-                        new("Wall Sneak (Top)", new(-6285, -2220, -2080)),
-                        new("Ventilation Shaft", new(-1870, 4765, -3755)),
-                        new("Vault Entrance", new(-1085, -100, 2460)),
-                        new("Ship Dock", new(7855, -24360, -3670)),
-                        new("RC Car Track", new(-13650, -14110, -2090)),
-                        new("Random Rope", new(-16480, 1520, -2730)),
-                        new("Rock Formation", new(13730, 20650, 2200)),
+                        new("Spawn", -6715, -14380, -2800),
+                        new("Wall sneak (top)", -6285, -2220, -2080),
+                        new("Ventilation shaft", -1870, 4765, -3755),
+                        new("Vault", -1085, -100, 2460),
+                        new("Ship dock", 7855, -24360, -3670),
+                        new("RC car track", -13650, -14110, -2090),
+                        new("Random rope", -16480, 1520, -2730),
+                        new("Rock formation", 13730, 20650, 2200),
                     }
                 ),
                 new($"{SubMapNamePrefix}Underwater",
                     new()
                     {
-                        new("Spawn", new(51570, 23850, -5745)),
-                        new("Water Tube", new(745, -34265, -720)),
-                        new("Boss Area", new(10200, -59780, 0)),
+                        new("Spawn", 51570, 23850, -5745),
+                        new("Water tube", 745, -34265, -720),
+                        new("Boss area", 10200, -59780, 0),
                     }
                 ),
-                new($"{SubMapNamePrefix}Cooper Vault (entrance)",
+                new($"{SubMapNamePrefix}Cooper vault (lobby)",
                     new()
                     {
-                        new("Center", new(0, 0, 140)),
-                        new("Entrance Door", new(4350, -45, 560)),
+                        new("Center", 0, 0, 140),
+                        new("Vault door", 4350, -45, 560),
                     }
                 ),
-                new($"{SubMapNamePrefix}Cooper Vault (gauntlet)",
+                new($"{SubMapNamePrefix}Cooper vault (gauntlet)",
                     new()
                     {
-                        new("Slytunkhamen II", new(-28690, 21665, -2075)),
-                        new("Sir Galleth Cooper", new(-24715, 13995, -2160)),
-                        new("Salim Al-Kupar", new(-13760, 12485, -2100)),
-                        new("Slaigh MacCooper", new(-15325, 24680, -2090)),
-                        new("Rioichi Cooper", new(-21130, 19955, -80)),
-                        new("Henriette Cooper", new(-10530, 13200, 220)),
-                        new("Tennesee 'Kid' Cooper", new(2010, 13275, -2180)),
-                        new("Thaddeus Winslow Cooper III", new(9360, 1820, -2085)),
-                        new("Otto Van Cooper", new(-2050, 2740, 100)),
-                        new("Conner Cooper", new(7515, 5030, 250)),
-                        new("Inner Sanctum Entrance", new(16645, -2260, 220)),
+                        new("Slytunkhamen II", -28690, 21665, -2075),
+                        new("Sir Galleth Cooper", -24715, 13995, -2160),
+                        new("Salim Al-Kupar", -13760, 12485, -2100),
+                        new("Slaigh MacCooper", -15325, 24680, -2090),
+                        new("Rioichi Cooper", -21130, 19955, -80),
+                        new("Henriette Cooper", -10530, 13200, 220),
+                        new("Tennesee 'Kid' Cooper", 2010, 13275, -2180),
+                        new("Thaddeus Winslow Cooper III", 9360, 1820, -2085),
+                        new("Otto Van Cooper", -2050, 2740, 100),
+                        new("Conner Cooper", 7515, 5030, 250),
+                        new("Inner Sanctum door", 16645, -2260, 220),
                     }
                 ),
-                new($"{SubMapNamePrefix}Dr. M's Arena",
+                new($"{SubMapNamePrefix}Dr. M's arena",
                     new()
                     {
-                        new("Center", new(0, 0, 130)),
-                        new("Top", new(-3840, 1600, 2970)),
+                        new("Center", 0, 0, 130),
+                        new("Top", -3840, 1600, 2970),
                     }
                 ),
             };

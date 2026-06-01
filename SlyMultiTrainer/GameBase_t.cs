@@ -9,8 +9,8 @@ namespace SlyMultiTrainer
         private Memory.Mem _m;
         private int _lastMapId;
         private int _lastActCharId;
-        public bool _isFirstLoopAfterLoading;
-        public string Region;
+        private bool _isFirstLoopAfterLoading;
+        private bool _canSkipDialogueWithBind;
 
         protected string FOVAddress;
         protected string ClockAddress;
@@ -20,18 +20,26 @@ namespace SlyMultiTrainer
         protected string MapIdAddress;
         protected string GadgetAddress;
         protected string GuardAIAddress;
-        protected Character_t ActiveCharacter;
+        protected string CanCameraNoclipAddress;
+        protected string ControllerAddress;
+        protected string DialoguePointer;
+        protected string SkipFMVPointer;
 
+        public Build_t Build;
+        public Character_t ActiveCharacter;
+        public Controller_t Controller;
         public List<Character_t> Characters;
         public List<List<Gadget_t>> Gadgets;
         public List<Map_t> Maps;
+        public Dictionary<string, List<Warp_t>> CustomWarps;
 
-        protected GameBase_t(Memory.Mem m, Form1 form, string region)
+        protected GameBase_t(Form1 form, Memory.Mem m, Build_t build)
         {
             _form = form;
             _m = m;
-            Region = region;
+            Build = build;
             _isFirstLoopAfterLoading = true;
+            _canSkipDialogueWithBind = true;
             Characters = GetCharacters();
             Gadgets = GetGadgets();
             Maps = GetMaps();
@@ -47,98 +55,78 @@ namespace SlyMultiTrainer
         // Main loop tick for all games
         public void OnLoopTick()
         {
-            // Shared logic
+            int mapId = ReadMapId() + 1; // + first item for current map
+            if (mapId != 0 && mapId != _lastMapId)
+            {
+                OnMapChange(mapId);
+                
+                // If we load a savestate, pcsx2 needs time to restore the memory
+                // We return here so that pcsx2 has enough time to finish restoring the memory
+                // E.g. for pcsx2 to restore the bytes for all "Entrance" warp points
+                return;
+            }
+
+            Controller = GetController();
+            if (IsLoading())
+            {
+                // While the map is loading
+                _isFirstLoopAfterLoading = true;
+                _form.UpdateUI(_form.grpGadgets, false, "Enabled");
+                _lastActCharId = 0;
+                // Done here too for FMVs
+                HandleDialogueSkipBind();
+                return;
+            }
+
+            if (_isFirstLoopAfterLoading)
+            {
+                // Only run once after map loading
+                if (mapId == 0)
+                {
+                    // For sly 1 no map (before splash appears)
+                    return;
+                }
+
+                _isFirstLoopAfterLoading = false;
+                RefreshWarps(mapId);
+                OnFirstLoopAfterLoading(mapId);
+                if (this is Sly1Handler)
+                {
+                    _form.UpdateUI(_form.grpGadgets, true, "Enabled");
+                }
+
+                _form.UpdateUI(() =>
+                {
+                    var maps = (List<Map_t>)_form.cmbMaps.DataSource!;
+                    maps[0].Name = $"[Current map: {Maps[mapId].Name.TrimStart()}]";
+                    ((CurrencyManager)_form.cmbMaps.BindingContext![maps]).Refresh();
+                });
+            }
+
             _form.UpdateUI(_form.trkFOV, ReadFOV() * 10);
             _form.UpdateUI(_form.trkClock, ReadClock() * 10);
             _form.UpdateUI(_form.trkDrawDistance, ReadDrawDistance() * 10);
 
-            var mapId = GetMapId() + 1; // + first item for current map
-            if (mapId != 0 && mapId != _lastMapId)
+            UpdateActChar();
+            HandleDialogueSkipBind();
+
+            string tabName = "";
+            _form.UpdateUI(() =>
             {
-                OnMapChange(mapId);
+                tabName = _form.tabControlMain.SelectedTab.Name;
+            });
+
+            if (tabName == "tabEntities")
+            {
+                UpdateEntities();
             }
-
-            if (!IsLoading())
+            else if (tabName == "tabDAG")
             {
-                if (_isFirstLoopAfterLoading)
-                {
-                    _isFirstLoopAfterLoading = false;
-                    if (this is Sly2Handler)
-                    {
-                        (this as Sly2Handler).Savefile.Init();
-                    }
-                    else if (this is Sly3Handler)
-                    {
-                        (this as Sly3Handler).Savefile.Init();
-
-                        // In sly 3, not all characters are available in all maps (e.g. ep1 police station only has sly)
-                        // So, we need to filter the character list based on the entities list
-
-                        var list = (this as Sly3Handler).GetFKXList();
-                        List<Character_t> newCharacters = new(Characters);
-                        for (int i = 0; i < newCharacters.Count; i++)
-                        {
-                            var character = newCharacters[i];
-                            var fkEntity = list.FirstOrDefault(x => x.Name == character.InternalName);
-                            if (fkEntity == null || fkEntity.SpawnRule == 0)
-                            {
-                                // Remove if not found or its spawn rule is 0 (shaman in kaine island)
-                                newCharacters.Remove(character);
-                                i--;
-                                continue;
-                            }
-
-                            // Sly 3 ntsc e3 demo doesn't have the same ids as retail
-                            // So let's read them on the fly
-                            int id = _m.ReadInt((fkEntity.EntityAddress[0] + 0x18).ToString("X"));
-                            newCharacters[i].Id = id;
-                        }
-
-                        if (newCharacters.Count != 0)
-                        {
-                            if (!newCharacters.SequenceEqual((List<Character_t>)_form.cmbActChar.DataSource))
-                            {
-                                _form.UpdateUI(() =>
-                                {
-                                    var last = _form.cmbActChar.SelectedItem;
-                                    _form.cmbActChar.DataSource = newCharacters;
-                                    if (newCharacters.Contains(last))
-                                    {
-                                        // If the new map contains the latest character, automatically select it
-                                        _form.cmbActChar.SelectedItem = last;
-                                    }
-                                });
-                            }
-                        }
-                    }
-                }
-
-                UpdateActChar();
-
-                string tabName = "";
-                _form.UpdateUI(() =>
-                {
-                    tabName = _form.tabControlMain.SelectedTab.Name;
-                });
-
-                if (tabName == "tabEntities")
-                {
-                    UpdateEntities();
-                }
-                else if (tabName == "tabDAG")
-                {
-                    UpdateDAG();
-                }
-                else if (tabName == "tabStrings")
-                {
-                    UpdateStrings();
-                }
+                UpdateDAG();
             }
-            else
+            else if (tabName == "tabStrings")
             {
-                _isFirstLoopAfterLoading = true;
-                _form.UpdateUI(_form.grpGadgets, false, "Enabled");
-                _lastActCharId = 0;
+                UpdateStrings();
             }
 
             // Game specific logic
@@ -160,28 +148,29 @@ namespace SlyMultiTrainer
                          || _isFirstLoopAfterLoading)
                         {
                             _lastActCharId = actCharId;
-
                             var characters = _form.cmbActChar.DataSource as List<Character_t>;
                             int currentCharacter = characters.FindIndex(x => x.Id == actCharId);
-                            if (currentCharacter == -1
-                                || characters[currentCharacter].NameForSavefile == "")
+                            _form.grpGadgets.Enabled = false;
+                            _form.cmbGadgetL1.SelectedIndex = 0;
+                            _form.cmbGadgetL2.SelectedIndex = 0;
+                            _form.cmbGadgetR2.SelectedIndex = 0;
+                            if (currentCharacter != -1)
                             {
-                                _form.grpGadgets.Enabled = false;
-                                _form.cmbGadgetL1.SelectedIndex = 0;
-                                _form.cmbGadgetL2.SelectedIndex = 0;
-                                _form.cmbGadgetR2.SelectedIndex = 0;
-                                return;
+                                // A character might be playable but don't have gadgets (e.g. sly 3 guru)
+                                _form.cmbActChar.SelectedIndex = currentCharacter;
+                                ActiveCharacter = characters[currentCharacter];
+                                if (characters[currentCharacter].NameForSavefile != "")
+                                {
+                                    // Character is playable and has gadgets
+                                    _form.grpGadgets.Enabled = true;
+                                    List<Gadget_t> characterGadgetsL1 = new(Gadgets[currentCharacter].Where(x => x.IsBindable));
+                                    List<Gadget_t> characterGadgetsR2 = new(Gadgets[currentCharacter].Where(x => x.IsBindable));
+                                    List<Gadget_t> characterGadgetsL2 = new(Gadgets[currentCharacter].Where(x => x.IsBindable));
+                                    _form.cmbGadgetL1.DataSource = characterGadgetsL1;
+                                    _form.cmbGadgetL2.DataSource = characterGadgetsL2;
+                                    _form.cmbGadgetR2.DataSource = characterGadgetsR2;
+                                }
                             }
-
-                            _form.grpGadgets.Enabled = true;
-                            _form.cmbActChar.SelectedIndex = currentCharacter;
-                            ActiveCharacter = characters[currentCharacter];
-                            List<Gadget_t> characterGadgetsL1 = new(Gadgets[currentCharacter]);
-                            List<Gadget_t> characterGadgetsL2 = new(Gadgets[currentCharacter]);
-                            List<Gadget_t> characterGadgetsR2 = new(Gadgets[currentCharacter]);
-                            _form.cmbGadgetL1.DataSource = characterGadgetsL1;
-                            _form.cmbGadgetL2.DataSource = characterGadgetsL2;
-                            _form.cmbGadgetR2.DataSource = characterGadgetsR2;
                         }
                     }
                 });
@@ -193,27 +182,27 @@ namespace SlyMultiTrainer
                 _form.UpdateUI(_form.lblYCoord, DefaultValueFloat);
                 _form.UpdateUI(_form.lblZCoord, DefaultValueFloat);
                 _form.UpdateUI(_form.chkActCharHealthFreeze, DefaultValueInt);
+                _form.UpdateUI(_form.lblSpeed, DefaultValueFloat);
                 return;
             }
 
-            // Position and health
             Vector3 position = ReadActCharLocalTranslation();
             _form.UpdateUI(_form.lblXCoord, position.X);
             _form.UpdateUI(_form.lblYCoord, position.Y);
             _form.UpdateUI(_form.lblZCoord, position.Z);
             _form.UpdateUI(_form.chkActCharHealthFreeze, ReadActCharHealth());
+            _form.UpdateUI(_form.lblSpeed, ReadActCharVelocity().Length());
 
             // Fly logic
             if (_form.chkActCharFly.Checked)
             {
-                Controller_t controller = GetController();
                 string FlyButtonUp = Properties.Settings.Default.FlyButtonUp;
                 string FlyButtonDown = Properties.Settings.Default.FlyButtonDown;
                 string FlyButtonAccelerate = Properties.Settings.Default.FlyButtonAccelerate;
 
-                if (controller.IsButtonPressed(FlyButtonAccelerate))
+                if (Controller.IsButtonPressed(FlyButtonAccelerate))
                 {
-                    FreezeActCharSpeedMultiplier(DefaultAmountToIncreaseOrDecreaseTranslationForActChar / 50);
+                    FreezeActCharSpeedMultiplier(AmountToIncreaseOrDecreaseTranslationForActChar / 50);
                 }
                 else
                 {
@@ -221,37 +210,37 @@ namespace SlyMultiTrainer
                     WriteActCharSpeedMultiplier(1);
                 }
 
-                if (controller.IsButtonPressed(FlyButtonUp))
+                if (Controller.IsButtonPressed(FlyButtonUp))
                 {
                     // up
                     //    unfreeze Z
                     //    set velocity Z to 500, keep freeze
                     UnfreezeActCharLocalTranslationZ();
 
-                    if (controller.IsButtonPressed(FlyButtonAccelerate))
+                    if (Controller.IsButtonPressed(FlyButtonAccelerate))
                     {
-                        FreezeActCharVelocityZ((DefaultAmountToIncreaseOrDecreaseTranslationForActChar * 7).ToString());
+                        FreezeActCharVelocityZ((AmountToIncreaseOrDecreaseTranslationForActChar * 7).ToString());
                     }
                     else
                     {
-                        FreezeActCharVelocityZ((DefaultAmountToIncreaseOrDecreaseTranslationForActChar * 3).ToString());
+                        FreezeActCharVelocityZ((AmountToIncreaseOrDecreaseTranslationForActChar * 3).ToString());
                     }
 
                 }
-                else if (controller.IsButtonPressed(FlyButtonDown))
+                else if (Controller.IsButtonPressed(FlyButtonDown))
                 {
                     // down
                     //    unfreeze Z
                     //    set velocity Z to -500, keep freeze
                     UnfreezeActCharLocalTranslationZ();
 
-                    if (controller.IsButtonPressed(FlyButtonAccelerate))
+                    if (Controller.IsButtonPressed(FlyButtonAccelerate))
                     {
-                        FreezeActCharVelocityZ((-DefaultAmountToIncreaseOrDecreaseTranslationForActChar * 7).ToString());
+                        FreezeActCharVelocityZ((-AmountToIncreaseOrDecreaseTranslationForActChar * 7).ToString());
                     }
                     else
                     {
-                        FreezeActCharVelocityZ((-DefaultAmountToIncreaseOrDecreaseTranslationForActChar * 3).ToString());
+                        FreezeActCharVelocityZ((-AmountToIncreaseOrDecreaseTranslationForActChar * 3).ToString());
                     }
                 }
                 else
@@ -299,48 +288,78 @@ namespace SlyMultiTrainer
             }
         }
 
+        void HandleDialogueSkipBind()
+        {
+            string SkipCurrentDialogueBind = Properties.Settings.Default.SkipCurrentDialogueBind;
+            if (_canSkipDialogueWithBind && Controller.IsButtonPressed(SkipCurrentDialogueBind))
+            {
+                _canSkipDialogueWithBind = false;
+                SkipCurrentDialogue();
+            }
+            else if (Controller.IsNoButtonPressed())
+            {
+                _canSkipDialogueWithBind = true;
+            }
+        }
+
         void UpdateActCharGadgetBind(ComboBox cmbGadget, GADGET_BIND bind)
         {
-            if (!cmbGadget.DroppedDown
-                && !cmbGadget.ContainsFocus)
+            if (cmbGadget.DroppedDown
+             || cmbGadget.ContainsFocus
+             || cmbGadget.DataSource is not List<Gadget_t> gadgets)
             {
-                if (cmbGadget.DataSource is not List<Gadget_t> gadgets)
-                {
-                    return;
-                }
-
-                int gadgetId = ReadActCharGadgetId(bind);
-
-                // Default to none
-                int selectedIndex = 0;
-
-                // Find the index of the gadget in the list only if a gadget is binded
-                if (gadgetId != 0 && gadgetId != -1)
-                {
-                    selectedIndex = gadgets.FindIndex(x => x.Id == gadgetId);
-                }
-
-                cmbGadget.SelectedIndex = selectedIndex;
+                // Do not update if the combobox is opened
+                return;
             }
+
+            int gadgetId = ReadActCharGadgetId(bind);
+
+            // Default to none
+            int selectedIndex = 0;
+
+            // Find the index of the gadget in the list only if a gadget is binded
+            if (gadgetId != 0 && gadgetId != -1)
+            {
+                selectedIndex = gadgets.FindIndex(x => x.Id == gadgetId);
+            }
+
+            cmbGadget.SelectedIndex = selectedIndex;
         }
 
         void UpdateEntities()
         {
-            if (_form.trvFKXList.Nodes.Count == 0)
+            if (_form.trvEntitiesList.Nodes.Count == 0)
             {
                 _form.UpdateUI(() =>
                 {
                     if (!_form.txtEntitiesSearch.Focused)
                     {
-                        _form.btnRefreshFKXList_Click(_form.btnRefreshFKXList, EventArgs.Empty);
+                        _form.btnEntitiesRefreshList_Click(_form.btnEntitiesRefreshList, EventArgs.Empty);
                     }
                 });
+            }
+
+            // Sly 3, for when the day hasn't changed but the time of day did
+            var fkList = _form.trvEntitiesList.Tag as List<FKXEntry_t>;
+            for (int i = 0; i < fkList.Count; i++)
+            {
+                var poolPointer = fkList[i].PoolPointer;
+                var poolPointerInGame = _m.ReadInt($"{fkList[i].Address}+4");
+                if (poolPointer != poolPointerInGame)
+                {
+                    _form.UpdateUI(() =>
+                    {
+                        _form.trvEntitiesList.Nodes.Clear();
+                    });
+
+                    return;
+                }
             }
 
             int pointerToEntity = 0;
             _form.UpdateUI(() =>
             {
-                pointerToEntity = _form.GetPointerToEntityFromSelectedFKXNode();
+                pointerToEntity = _form.GetPointerToEntityFromSelectedEntitiesNode();
             });
 
             if (pointerToEntity == 0)
@@ -349,26 +368,29 @@ namespace SlyMultiTrainer
             }
 
             Vector3 localTrans = ReadEntityLocalTranslation(pointerToEntity.ToString("X"));
-            _form.UpdateUI(_form.lblFKXEntityXCoord, localTrans.X);
-            _form.UpdateUI(_form.lblFKXEntityYCoord, localTrans.Y);
-            _form.UpdateUI(_form.lblFKXEntityZCoord, localTrans.Z);
+            _form.UpdateUI(_form.lblEntitiesXCoord, localTrans.X);
+            _form.UpdateUI(_form.lblEntitiesYCoord, localTrans.Y);
+            _form.UpdateUI(_form.lblEntitiesZCoord, localTrans.Z);
 
-            Vector3 worldTrans = ReadEntityFinalTranslation(pointerToEntity.ToString("X"));
-            _form.UpdateUI(_form.lblFKXEntityXCoordWorld, worldTrans.X);
-            _form.UpdateUI(_form.lblFKXEntityYCoordWorld, worldTrans.Y);
-            _form.UpdateUI(_form.lblFKXEntityZCoordWorld, worldTrans.Z);
+            Vector3 localVelocity = ReadEntityLocalVelocity(pointerToEntity.ToString("X"));
+            _form.UpdateUI(_form.lblEntitiesSpeed, localVelocity.Length());
+
+            Vector3 worldTrans = ReadEntityFinalCombinedTranslation(pointerToEntity.ToString("X"));
+            _form.UpdateUI(_form.lblEntitiesXCoordWorld, worldTrans.X);
+            _form.UpdateUI(_form.lblEntitiesYCoordWorld, worldTrans.Y);
+            _form.UpdateUI(_form.lblEntitiesZCoordWorld, worldTrans.Z);
 
             float scale = ReadEntityLocalScale(pointerToEntity.ToString("X"));
-            _form.UpdateUI(_form.trkFKXEntityScale, scale * 10);
+            _form.UpdateUI(_form.trkEntitiesScale, scale * 10);
 
             // Read rotation only if the edit checkbox is not checked
-            if (!_form.chkFKXEntityEditRotation.Checked)
+            if (!_form.chkEntitiesEditRotation.Checked)
             {
                 Matrix4x4 rotationMatrix = ReadEntityWorldTransformation(pointerToEntity.ToString("X"));
                 var euler = ExtractEulerAngles(rotationMatrix);
-                _form.UpdateUI(_form.trkFKXEntityRotationX, euler.X);
-                _form.UpdateUI(_form.trkFKXEntityRotationY, euler.Y);
-                _form.UpdateUI(_form.trkFKXEntityRotationZ, euler.Z);
+                _form.UpdateUI(_form.trkEntitiesRotationX, euler.X);
+                _form.UpdateUI(_form.trkEntitiesRotationY, euler.Y);
+                _form.UpdateUI(_form.trkEntitiesRotationZ, euler.Z);
             }
         }
 
@@ -483,7 +505,18 @@ namespace SlyMultiTrainer
             for (int i = 0; i < DAG.Clusters.Count; i++)
             {
                 Cluster_t cluster = DAG.Clusters[i];
+                // To true because we want to read the new suck value
                 Cluster_t clusterInGame = DAG.ReadCluster(cluster.Address, true);
+
+                if (cluster.Id != clusterInGame.Id)
+                {
+                    _form.UpdateUI(() =>
+                    {
+                        DAG.TriggerRefresh();
+                    });
+
+                    return;
+                }
 
                 bool areClustersEqual = DAG.IsClusterEqualToCluster(cluster, clusterInGame);
                 if (!areClustersEqual)
@@ -534,106 +567,137 @@ namespace SlyMultiTrainer
                     return;
                 }
 
-                List<(int id, string str)> list;
+                Sly2_3_Savefile savefile;
                 if (this is Sly2Handler)
                 {
-                    list = (this as Sly2Handler).Savefile.GetSavefileKeyAddressTable(true);
+                    savefile = (this as Sly2Handler).Savefile;
                 }
                 else
                 {
-                    list = (this as Sly3Handler).Savefile.GetSavefileKeyAddressTable(true);
+                    savefile = (this as Sly3Handler).Savefile;
                 }
-
-                var output = $"Id + SubId - Address - Group - Property{Environment.NewLine}";
-                output += string.Join(Environment.NewLine, list.Select(i => $"{i.str}"));
-                _form.UpdateUI(_form.txtStringsSavefile, output);
+                
+                List<string> list = savefile.DumpSavefileAddressTable(true);
+                _form.UpdateUI(_form.txtStringsSavefile, $"Address - Field path{Environment.NewLine}{string.Join(Environment.NewLine, list)}");
             }
         }
 
         public abstract void CustomTick();
-
+        public abstract void OnFirstLoopAfterLoading(int mapId);
         public void OnMapChange(int mapId)
         {
-            // On map change
             _isFirstLoopAfterLoading = true;
             _lastMapId = mapId;
-            _form.UpdateUI(_form.cmbWarps, Maps[mapId].Warps);
 
-            // Reset entities, dag and the strings which are all map dependent
+            // Reset entities, dag and the localized strings which are all map dependent
             if (this is Sly2Handler || this is Sly3Handler)
             {
-                DAG_t DAG = this is Sly2Handler ? (this as Sly2Handler).DAG : (this as Sly3Handler).DAG;
+                DAG_t DAG;
+                if (this is Sly2Handler)
+                {
+                    DAG = (this as Sly2Handler).DAG;
+                }
+                else
+                {
+                    DAG = (this as Sly3Handler).DAG;
+                }
+
                 _form.UpdateUI(() =>
                 {
-                    _form.trvFKXList.Nodes.Clear();
-                    _form.txtStringsLocalized.Text = "";
+                    _form.trvEntitiesList.Nodes.Clear();
                     DAG.TriggerRefresh();
+                    _form.txtStringsLocalized.Text = "";
                 });
+            }
+        }
+
+        public void RefreshWarps(int mapId)
+        {
+            List<Warp_t> warpsToAdd = new();
+
+            // Check settings for which warps to add
+            string[] items = Properties.Settings.Default.WarpsList.Split('|');
+            foreach (var item in items)
+            {
+                string[] parts = item.Split(';');
+                string name = parts[0];
+                bool.TryParse(parts[1], out bool isChecked);
+                if (isChecked)
+                {
+                    switch (name)
+                    {
+                        case "Built-in":
+                            warpsToAdd.AddRange(Maps[mapId].Warps);
+                            break;
+                        case "Custom":
+                            // TrimStart to remove the sub map name prefix
+                            if (CustomWarps.TryGetValue(Maps[mapId].Name.TrimStart().ToUpper(), out List<Warp_t> customWarps))
+                            {
+                                warpsToAdd.AddRange(customWarps);
+                            }
+                            break;
+                        case "Entrance":
+                            List<Warp_t> mapEntrances = GetEntranceLocations();
+                            warpsToAdd.AddRange(mapEntrances);
+                            break;
+                    }
+                }
+            }
+
+            // Only update if this is the first time or we changed map
+            // So if the game reloaded to the same map, we should not update the warps list
+            if (_form.cmbWarps.DataSource == null
+             || !warpsToAdd.SequenceEqual((List<Warp_t>)_form.cmbWarps.DataSource))
+            {
+                _form.UpdateUI(_form.cmbWarps, warpsToAdd);
+
+                if (this is not Sly1Handler)
+                {
+                    _form.UpdateUI(_form.cmbEntitiesWarps, new List<Warp_t>(warpsToAdd));
+                }
             }
         }
 
         public abstract bool IsLoading();
 
         #region Gadgets
+        // Read and write "bitfield64" because the value is not reversed on ps3
         public virtual long ReadGadgets()
         {
-            return _m.ReadLong(GadgetAddress);
+            return _m.ReadBitfield64(GadgetAddress);
         }
 
-        public void ToggleAllGadgets()
+        public virtual void WriteGadgets(long value)
         {
-            if (this is Sly1Handler)
+            _m.WriteMemory(GadgetAddress, "bitfield64", value.ToString());
+        }
+
+        public virtual bool IsGadgetEarned(long gadgets, Gadget_t gadget)
+        {
+            if (gadget.Id == -1)
             {
-                int gadgets = (int)(this as Sly1Handler).ReadGadgets();
-                if (gadgets == -1)
-                {
-                    _m.WriteMemory(GadgetAddress, "int", "0");
-                }
-                else
-                {
-                    _m.WriteMemory(GadgetAddress, "int", (-1).ToString());
-                }
+                return false;
             }
-            else if (this is Sly2Handler)
+
+            bool isEarned = (gadgets & gadget.Mask) != 0;
+            return isEarned;
+        }
+
+        public virtual long ToggleEarnedGadget(long gadgets, Gadget_t gadget, bool isEarned)
+        {
+            if (isEarned)
             {
-                long gadgets = ReadGadgets();
-                if (gadgets == -1)
-                {
-                    _m.WriteMemory(GadgetAddress, "long", "0");
-                }
-                else
-                {
-                    _m.WriteMemory(GadgetAddress, "long", (-1).ToString());
-                }
+                gadgets |= gadget.Mask;
             }
             else
             {
-                long gadgets = ReadGadgets();
-                if (gadgets == -1)
-                {
-                    string value = "0x00000200000200FE";
-                    // Some of the "gadgets" are actually essential skillset
-                    // For example sly's square attack, binocucom, or bentley mines
-                    // The following value is the value set by the game when loading a new game
-                    if (Region == "NTSC July 16"
-                        || Region == "NTSC Regular Demo")
-                    {
-                        value = "0x00000800000200FE";
-                    }
-                    else if (Region == "NTSC E3 Demo")
-                    {
-                        value = "0";
-                    }
-
-                    _m.WriteMemory(GadgetAddress, "long", value);
-                }
-                else
-                {
-                    _m.WriteMemory(GadgetAddress, "long", (-1).ToString());
-                }
+                gadgets &= ~gadget.Mask;
             }
+
+            return gadgets;
         }
 
+        public abstract void ToggleAllGadgets();
         public abstract void FreezeActCharGadgetPower(int value = 0);
         public abstract void UnfreezeActCharGadgetPower();
         public abstract int ReadActCharGadgetId(GADGET_BIND bind);
@@ -651,22 +715,38 @@ namespace SlyMultiTrainer
         // Sly 1 only has 1 transformation component (2 4x4 matrices)
 
         // Sly 2 and 3 have 4 transformation components (2 4x4 matrices per transformation component; 8 4x4 matrices in total)
-        // Sometimes, the last 2 transformation components are the same (e.g. not the case for carmelita in sly 3)
-        // The first transformation component is the origin
-        // The second transformation component is the local transformation
-        // The third transformation component is the world transformation
-        // The fourth transformation component is (usually) the same as the world transformation. We can call it "final transformation"
+        // Sometimes the last 2 transformation components are the same (e.g. sly in sly 2 ep1)
+        // Sometimes the last 2 transformation components are different (e.g. carmelita in sly 3 ep1)
+        // These are the names given to the 4 transformation components: Origin, Local, World, Final
         // Each transformation component has 2 4x4 transformation matrices. One at +0x0 and one at +0x40
-        // The one at +0x0 is write-able and is relative transformation from the previous transformation component
-        // The one at +0x40 is not write-able and it's the multiplication of the matrix at +0x0 and the matrix at +0x40 of the previous transformation component
+        // The one at +0x0 is write-able and it's the delta (relative) transformation from the previous transformation component
+        // The one at +0x40 is not write-able and it's the multiplication (combined) of the matrix at +0x0 of "this" transformation component and the matrix at +0x40 of the previous transformation component
 
         public abstract bool EntityHasTransformation(string pointerToEntity);
+
+        // Used for sly 2 and 3 for warping to entrance locations (sly, bentley and murray have different height)
+        public abstract Vector3 ReadEntityDeltaTranslation(string pointerToEntity);
         #region Origin
+        /*
+            Origin
+            OriginTransformation
+            OriginCombinedTransformation
+        */
         public abstract Matrix4x4 ReadEntityOriginTransformation(string pointerToEntity);
+        public abstract Matrix4x4 ReadEntityOriginCombinedTransformation(string pointerToEntity);
+        public abstract void WriteEntityOriginTransformation(string pointerToEntity, Matrix4x4 transformation);
+
         #endregion
 
         #region Local
+        /*
+            Local
+            LocalTransformation
+            LocalCombinedTransformation
+        */
         public abstract Matrix4x4 ReadEntityLocalTransformation(string pointerToEntity);
+        public abstract Matrix4x4 ReadEntityLocalCombinedTransformation(string pointerToEntity);
+        public abstract void WriteEntityLocalTransformation(string pointerToEntity, Matrix4x4 transformation);
         public abstract Vector3 ReadEntityLocalTranslation(string pointerToEntity);
         public abstract void WriteEntityLocalTranslation(string pointerToEntity, Vector3 value);
         public abstract void FreezeEntityLocalTranslationX(string pointerToEntity, string value = "");
@@ -677,35 +757,61 @@ namespace SlyMultiTrainer
         public abstract void UnfreezeEntityLocalTranslationZ(string pointerToEntity);
         public abstract float ReadEntityLocalScale(string pointerToEntity);
         public abstract void WriteEntityLocalScale(string pointerToEntity, float value);
+        public abstract Vector3 ReadEntityLocalVelocity(string pointerToEntity);
+        public abstract void WriteEntityLocalVelocity(string pointerToEntity, Vector3 value);
         #endregion
 
         #region World
+        /*
+            World
+            WorldTransformation
+            WorldCombinedTransformation
+        */
         public abstract Matrix4x4 ReadEntityWorldTransformation(string pointerToEntity);
+        public abstract Matrix4x4 ReadEntityWorldCombinedTransformation(string pointerToEntity);
         public abstract void WriteEntityWorldTransformation(string pointerToEntity, Matrix4x4 value);
+        #endregion
+
         #region Final
-        public abstract Vector3 ReadEntityFinalTranslation(string pointerToEntity);
+        /*
+            Final
+            FinalTransformation
+            FinalCombinedTransformation
+        */
+        public abstract Matrix4x4 ReadEntityFinalTransformation(string pointerToEntity);
+        public abstract Matrix4x4 ReadEntityFinalCombinedTransformation(string pointerToEntity);
+        public abstract Vector3 ReadEntityFinalCombinedTranslation(string pointerToEntity);
+        public abstract void WriteEntityFinalTransformation(string pointerToEntity, Matrix4x4 value);
         #endregion
 
-        #endregion
-
-        public void WarpSourceEntityToPoint(string pointerToSourceEntity, Vector3 point)
+        public void WarpSourceEntityToPoint(string pointerToSourceEntity, Matrix4x4 point)
         {
             if (pointerToSourceEntity == "")
             {
                 pointerToSourceEntity = GetActCharPointer();
             }
 
-            if (this is Sly2Handler || this is Sly3Handler)
+            if (this is Sly1Handler)
             {
-                // Convert warp position to local space (sly 2 ep1 npc_boar_guard, sly 3 carmelita)
-                Matrix4x4 originMatrix = ReadEntityOriginTransformation(pointerToSourceEntity);
-                Matrix4x4 warpMatrix = Matrix4x4.CreateTranslation(point);
-                Matrix4x4.Invert(originMatrix, out Matrix4x4 originInverse);
-                Matrix4x4 local = warpMatrix * originInverse;
-                point = local.Translation;
+                WriteEntityLocalTransformation(pointerToSourceEntity, point);
+                return;
             }
 
-            WriteEntityLocalTranslation(pointerToSourceEntity, point);
+            // Convert warp position to local space (sly 2 ep1 npc_boar_guard, sly 3 carmelita)
+            Matrix4x4 originMatrix = ReadEntityOriginTransformation(pointerToSourceEntity);
+            Matrix4x4.Invert(originMatrix, out Matrix4x4 originInverse);
+            point = point * originInverse;
+
+            // Normalize point because characters have different height
+            Vector3 delta = ReadEntityDeltaTranslation(pointerToSourceEntity);
+            point.Translation = point.Translation + delta;
+            WriteEntityLocalTranslation(pointerToSourceEntity, point.Translation);
+            WriteEntityWorldTransformation(pointerToSourceEntity, point);
+        }
+
+        public void WarpSourceEntityToPoint(string pointerToSourceEntity, Vector3 point)
+        {
+            WarpSourceEntityToPoint(pointerToSourceEntity, Matrix4x4.CreateTranslation(point));
         }
 
         public void WarpSourceEntityToDestEntity(string pointerToSourceEntity, string pointerToDestEntity)
@@ -715,8 +821,8 @@ namespace SlyMultiTrainer
                 pointerToDestEntity = GetActCharPointer();
             }
 
-            Vector3 point = ReadEntityFinalTranslation(pointerToDestEntity);
-            WarpSourceEntityToPoint(pointerToSourceEntity, point);
+            Matrix4x4 trans = ReadEntityFinalCombinedTransformation(pointerToDestEntity);
+            WarpSourceEntityToPoint(pointerToSourceEntity, trans);
         }
 
         #endregion
@@ -741,6 +847,8 @@ namespace SlyMultiTrainer
         public abstract void UnfreezeActCharLocalTranslationX();
         public abstract void UnfreezeActCharLocalTranslationY();
         public abstract void UnfreezeActCharLocalTranslationZ();
+        public abstract Vector3 ReadActCharVelocity();
+        public abstract void WriteActCharVelocity(Vector3 value);
         public abstract void FreezeActCharVelocityZ(string value = "");
         public abstract void UnfreezeActCharVelocityZ();
         public abstract float ReadActCharSpeedMultiplier();
@@ -753,6 +861,22 @@ namespace SlyMultiTrainer
         public abstract void ToggleUndetectable(bool enableUndetectable);
         public abstract void ToggleInvulnerable(bool enableInvulnerable);
         public abstract void ToggleInfiniteDbJump(bool enableInfDbJump);
+        public abstract void ActCharToggleNoclip(bool enableNoclip);
+
+        public virtual void ToggleNoclip(bool enableNoclip)
+        {
+            if (enableNoclip)
+            {
+                _m.WriteMemory($"{CanCameraNoclipAddress}", "int", "1");
+            }
+            else
+            {
+                _m.WriteMemory($"{CanCameraNoclipAddress}", "int", "0");
+            }
+
+            ActCharToggleNoclip(enableNoclip);
+        }
+
         public virtual void ToggleGuardAI(bool disableGuardAI)
         {
             if (disableGuardAI)
@@ -761,8 +885,8 @@ namespace SlyMultiTrainer
             }
             else
             {
-                _m.UnfreezeValue(GuardAIAddress);
                 _m.WriteMemory(GuardAIAddress, "int", "0");
+                _m.UnfreezeValue(GuardAIAddress);
             }
         }
         #endregion
@@ -852,7 +976,7 @@ namespace SlyMultiTrainer
         #endregion
 
         #region Maps
-        public virtual int GetMapId()
+        public virtual int ReadMapId()
         {
             return _m.ReadInt(MapIdAddress);
         }
@@ -861,8 +985,13 @@ namespace SlyMultiTrainer
         public abstract void LoadMap(int mapId, int entranceValue, int mode);
         #endregion
 
-        public abstract Controller_t GetController();
+        public abstract void SkipCurrentDialogue();
+        public Controller_t GetController()
+        {
+            return new(_m, ControllerAddress);
+        }
         protected abstract List<Character_t> GetCharacters();
+        protected abstract List<Warp_t> GetEntranceLocations();
         protected abstract List<List<Gadget_t>> GetGadgets();
         protected abstract List<Map_t> GetMaps();
     }

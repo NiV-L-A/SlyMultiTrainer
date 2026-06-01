@@ -12,7 +12,7 @@ namespace SlyMultiTrainer.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.14.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "18.6.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -56,6 +56,42 @@ namespace SlyMultiTrainer.Properties {
             }
             set {
                 this["FlyButtonAccelerate"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EntitiesSelectActChar {
+            get {
+                return ((bool)(this["EntitiesSelectActChar"]));
+            }
+            set {
+                this["EntitiesSelectActChar"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Built-in;true|Custom;true|Entrance;true")]
+        public string WarpsList {
+            get {
+                return ((string)(this["WarpsList"]));
+            }
+            set {
+                this["WarpsList"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("L1")]
+        public string SkipCurrentDialogueBind {
+            get {
+                return ((string)(this["SkipCurrentDialogueBind"]));
+            }
+            set {
+                this["SkipCurrentDialogueBind"] = value;
             }
         }
     }

@@ -8,26 +8,26 @@ namespace SlyMultiTrainer
     public partial class Form1 : Form
     {
         Memory.Mem _m;
+        GameBase_t? _game;
         Dictionary<string, TabPage> _hiddenTabs = new();
-        Image? _iconFreezeEnabled = Util.GetEmbeddedImage($"SlyMultiTrainer.Img.icon_freeze_enabled.png");
-        Image? _iconFreezeDisabled = Util.GetEmbeddedImage($"SlyMultiTrainer.Img.icon_freeze_disabled.png");
+        Image? _iconFreezeEnabled = Util.GetEmbeddedImage($"icon_freeze_enabled.png");
+        Image? _iconFreezeDisabled = Util.GetEmbeddedImage($"icon_freeze_disabled.png");
         string _formTitle = "";
-        GameBase_t _game;
         bool _triggerReattach = false;
+        Font _monospaceFont;
 
         public Form1()
         {
             InitializeComponent();
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            _monospaceFont = new Font("Courier New", 8F);
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
             // Run once to fill the process list immediately
             FillcmbProcesses();
-
             Init();
-
             Task.Run(async () =>
             {
                 while (true)
@@ -65,39 +65,34 @@ namespace SlyMultiTrainer
             // We use do-while (true) loops instead of while (condition) so that we
             // - don't have to check for the condition (true) if we need to exit in the first loop
             // - can have a Thread.Sleep only if we really need to loop again
+            // We shouldn't ever call Thread.Sleep if the emulator is already running with a game open
 
             // Clear controls
             UpdateUI(this, _formTitle);
-            UpdateUI(this, Util.GetEmbeddedIcon($"SlyMultiTrainer.Img.icon_1_256x256.ico")!, "Icon");
+            UpdateUI(this, Util.GetEmbeddedIcon($"icon_1_256x256.ico")!, "Icon");
             UpdateUI(lblAboutTitle, _formTitle);
             UpdateUI(lblXCoord, Util.DefaultValueFloat);
             UpdateUI(lblYCoord, Util.DefaultValueFloat);
             UpdateUI(lblZCoord, Util.DefaultValueFloat);
+            UpdateUI(chkActCharHealthFreeze, Util.DefaultValueInt);
+            UpdateUI(lblSpeed, Util.DefaultValueFloat);
             UpdateUI(txtAddresses, "");
             UpdateUI(txtStringsLocalized, "");
             UpdateUI(txtStringsSavefile, "");
-            ClearFKXTab();
+            UpdateUI(chkStringsMonospaceFont, false, "Checked");
+            ClearEntitiesTab();
             HideTab("Entities");
             HideTab("DAG");
             HideTab("Strings");
             HideTab("WorldStates");
-            UpdateUI(chkDisableDeathBarrier, false);
-            UpdateUI(chkDisableGuardAI, false);
-            UpdateUI(chkToggleInvulnerable, false);
-            UpdateUI(chkToggleUndetectable, false);
-            UpdateUI(lblLuckyCharms, false);
-            UpdateUI(btnToggleThiefMoves, false);
-            UpdateUI(cmbLuckyCharms, false);
-            UpdateUI(chkLuckyCharmsFreeze, false);
-            UpdateUI(btnSkipCurrentDialogue, false);
             for (int i = 0; i < tabMain.Controls.Count; i++)
             {
                 UpdateUI(tabMain.Controls[i], false, "Enabled");
             }
 
-            // Find pcsx2
-            UpdateUI(lblMain, "Not attached (Scanning for PCSX2/RPCS3 process...)");
-            UpdateUI(lblMain, Color.Red);
+            // Find the emulator
+            UpdateUI(lblProcessStatus, "Not attached (Scanning for PCSX2/RPCS3 process...)");
+            UpdateUI(lblProcessStatus, Color.Red);
             do
             {
                 UpdateUI(() =>
@@ -112,12 +107,12 @@ namespace SlyMultiTrainer
                     _m = new();
                     if (!_m.OpenProcess(process.Process.Id))
                     {
-                        bgWorkerMain.CancelAsync();
+                        _m.CloseProcess();
                         return;
                     }
 
-                    UpdateUI(lblMain, $"{_m.displayName} process found, but game not started");
-                    UpdateUI(lblMain, Color.DarkOrange);
+                    UpdateUI(lblProcessStatus, $"{_m.displayName} process found, but game build not detected");
+                    UpdateUI(lblProcessStatus, Color.DarkOrange);
                 });
 
                 if (_m != null && _m.mProc != null)
@@ -138,7 +133,7 @@ namespace SlyMultiTrainer
                     || _m.mProc.Process != null && _m.mProc.Process.HasExited
                     || _triggerReattach)
                 {
-                    // We exit if we found a matching build, we closed the emulator
+                    // We exit if we found a matching build or we closed the emulator
                     break;
                 }
 
@@ -156,14 +151,12 @@ namespace SlyMultiTrainer
                 return;
             }
 
-            _game = Util.GetGameFromBuild(build, _m, this);
-
-            _game.Maps.Insert(0, new("[Current map]", new() { new() }));
+            _game = Util.GetGameFromBuild(this, _m, build);
             UpdateUI(cmbMaps, _game.Maps.Where(x => x.IsVisible).ToList());
             UpdateUI(cmbMaps, _game.Maps, "Tag");
             UpdateUI(cmbActChar, _game.Characters);
-
             InitBuildUI(build);
+            _game.CustomWarps = Util.GetCustomWarps(build);
 
             while (true)
             {
@@ -175,8 +168,7 @@ namespace SlyMultiTrainer
                     }
                     else if (!Util.IsBuildCurrent(_m, build))
                     {
-                        // In older pcsx2 versions, when loading a savestate
-                        // sometimes the ee region would be set to 0
+                        // When loading a savestate in older pcsx2 versions sometimes the ee region would be set to 0
                         // This would cause the comparison for the build to return false.
                         // So let's wait a bit and check again if the user actually changed the game
                         if (_m.baseAddress == 0x20000000)
@@ -196,13 +188,28 @@ namespace SlyMultiTrainer
                         throw new Exception();
                     }
 
-                    // _m.DumpFrozenAddresses();
+                    //_m.DumpFrozenAddresses();
 
                     _game.OnLoopTick();
                     Thread.Sleep(50);
                 }
                 catch (Exception ex)
                 {
+                    // close sub forms
+                    FormCollection forms = Application.OpenForms;
+                    for (int i = 0; i < forms.Count; i++)
+                    {
+                        if (forms[i] != this)
+                        {
+                            UpdateUI(() =>
+                            {
+                                forms[i].DialogResult = DialogResult.OK;
+                                forms[i].Close();
+                            });
+                        }
+                    }
+
+                    // Clear controls added during runtime
                     UpdateUI(() =>
                     {
                         if (tabControlMain.Controls.ContainsKey("tabDAG"))
@@ -214,13 +221,17 @@ namespace SlyMultiTrainer
                             var tabWorldState = tabControlMain.Controls["tabWorldStates"]?.Controls["tabControlWorldStates"]?.Controls;
                             for (int i = 1; i <= 5; i++)
                             {
-                                tabWorldState?[$"tabWorldState{i}"]?.Controls.Clear();
+                                var world = tabWorldState?[$"tabWorldState{i}"];
+                                if (world != null)
+                                {
+                                    world.Controls.Clear();
+                                }
                             }
                         }
                     });
 
-                    _m.UnfreezeAll();
                     _m.CloseProcess();
+                    _game = null;
                     break;
                 }
             }
@@ -237,64 +248,71 @@ namespace SlyMultiTrainer
 
         void InitBuildUI(Util.Build_t build)
         {
-            UpdateUI(this, $"{_formTitle} - {build}");
-            UpdateUI(lblMain, $"Attached - Base at {_m.baseAddress:X}");
-            UpdateUI(lblMain, Color.Green);
-            UpdateUI(this, Util.GetEmbeddedIcon($"SlyMultiTrainer.Img.icon_{build.Title.Last()}_256x256.ico")!, "Icon");
-            UncheckAllCheckboxes(Controls);
-            for (int i = 0; i < tabMain.Controls.Count; i++)
+            UpdateUI(() =>
             {
-                UpdateUI(tabMain.Controls[i], true, "Enabled");
-            }
-            _m.UnfreezeAll();
-            SetTxtAddresses();
+                this.Text = $"{_formTitle} - {build}";
+                lblProcessStatus.Text = $"Attached - Base at {_m.baseAddress:X}";
+                lblProcessStatus.ForeColor = Color.Green;
+                this.Icon = Util.GetEmbeddedIcon($"icon_{build.Title.Last()}_256x256.ico")!;
+                ToolStripMenuItemActCharManageCustomWarps.Text = $"Manage {build.Title} custom warps...";
+                SetTxtAddresses();
+                SetControlsToDefault(tabMain.Controls);
+            });
 
-            UpdateUI(grpFOV, true, "Visible");
-            UpdateUI(btnFOVReset, true, "Visible");
-            UpdateUI(chkFOVFreeze, true, "Visible");
-            UpdateUI(grpDrawDistance, true, "Visible");
-            UpdateUI(btnDrawDistanceReset, true, "Visible");
-            UpdateUI(chkDrawDistanceFreeze, true, "Visible");
-            UpdateUI(grpClock, true, "Visible");
-            UpdateUI(btnClockReset, true, "Visible");
-            UpdateUI(chkClockFreeze, true, "Visible");
+            chkFOVFreeze.BackgroundImage = _iconFreezeDisabled;
+            chkClockFreeze.BackgroundImage = _iconFreezeDisabled;
+            chkDrawDistanceFreeze.BackgroundImage = _iconFreezeDisabled;
 
-            UpdateUI(chkToggleUndetectable, true, "Visible");
-            UpdateUI(chkToggleInvulnerable, true, "Visible");
-            UpdateUI(chkDisableGuardAI, true, "Visible");
-
+            // All controls here have visible and enabled set to true
+            // We change the visible property to false based on the game and build
             if (build.Title == "Sly 1")
             {
                 ShowTab("WorldStates");
-                UpdateUI(grpGadgets, false, "Visible");
-                UpdateUI(btnToggleThiefMoves, true);
-
-                if (build.Region == "NTSC Demo")
-                {
-                    UpdateUI(grpFOV, false, "Visible");
-                    UpdateUI(btnFOVReset, false, "Visible");
-                    UpdateUI(chkFOVFreeze, false, "Visible");
-                }
-                else if (build.Region == "NTSC May 19")
-                {
-                    UpdateUI(grpFOV, false, "Visible");
-                    UpdateUI(btnFOVReset, false, "Visible");
-                    UpdateUI(chkFOVFreeze, false, "Visible");
-                    HideTab("WorldStates");
-                }
-
                 UpdateUI(lblHealth, "Lives");
-                UpdateUI(chkInfiniteGadgetPower, false);
-                UpdateUI(lblLuckyCharms, true);
-                UpdateUI(cmbLuckyCharms, true);
-                UpdateUI(chkLuckyCharmsFreeze, true);
-                UpdateUI(chkToggleInfDbJump, true);
-                UpdateUI(btnSkipCurrentDialogue, true);
-                UpdateUI(chkDisableDeathBarrier, false);
+                UpdateUI(lblGadgetL1, false);
+                UpdateUI(lblGadgetL2, false);
+                UpdateUI(lblGadgetR2, false);
+                UpdateUI(cmbGadgetL1, false);
+                UpdateUI(cmbGadgetL2, false);
+                UpdateUI(cmbGadgetR2, false);
+                UpdateUI(chkGadgetInfinitePower, false);
                 UpdateUI(chkDisableGuardAI, false);
                 UpdateUI(chkToggleInvulnerable, false);
                 UpdateUI(chkToggleUndetectable, false);
-                UpdateUI(btnLoadLevelFull, false);
+                UpdateUI(btnLoadMapFull, false);
+
+                if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemo])
+                {
+                    UpdateUI(grpFOV, false);
+                    UpdateUI(btnFOVReset, false);
+                    UpdateUI(chkFOVFreeze, false);
+                    UpdateUI(chkToggleNoclip, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoJune14])
+                {
+                    UpdateUI(chkToggleNoclip, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.PALDemoPlayStationExperience])
+                {
+                    UpdateUI(grpFOV, false);
+                    UpdateUI(btnFOVReset, false);
+                    UpdateUI(chkFOVFreeze, false);
+                    UpdateUI(chkToggleNoclip, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCMay19])
+                {
+                    UpdateUI(grpFOV, false);
+                    UpdateUI(btnFOVReset, false);
+                    UpdateUI(chkFOVFreeze, false);
+                    UpdateUI(chkToggleNoclip, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCMay21])
+                {
+                    UpdateUI(grpFOV, false);
+                    UpdateUI(btnFOVReset, false);
+                    UpdateUI(chkFOVFreeze, false);
+                    UpdateUI(chkToggleNoclip, false);
+                }
             }
             else if (build.Title == "Sly 2")
             {
@@ -302,44 +320,45 @@ namespace SlyMultiTrainer
                 ShowTab("DAG");
                 ShowTab("Entities");
                 UpdateUI(lblHealth, "Health");
-                UpdateUI(btnToggleGadgets, true);
-                UpdateUI(chkInfiniteGadgetPower, true);
                 UpdateUI(lblLuckyCharms, false);
                 UpdateUI(cmbLuckyCharms, false);
                 UpdateUI(chkLuckyCharmsFreeze, false);
-                UpdateUI(btnLoadLevelFull, false);
-                UpdateUI(chkDisableDeathBarrier, false);
-                UpdateUI(btnSkipCurrentDialogue, false);
-                UpdateUI(chkToggleInfDbJump, true);
-                UpdateUI(chkToggleUndetectable, true);
-                UpdateUI(chkToggleInvulnerable, true);
-                UpdateUI(chkDisableGuardAI, true);
-                UpdateUI(grpGadgets, true, "Visible");
-                UpdateUI(btnToggleThiefMoves, false);
+                UpdateUI(btnLoadMapFull, false);
 
-                if (build.Region == "NTSC E3 Demo")
+                if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCE3Demo])
                 {
-                    UpdateUI(chkToggleUndetectable, false);
                     UpdateUI(chkToggleInvulnerable, false);
-                    UpdateUI(chkDisableGuardAI, false);
-                    UpdateUI(grpGadgets, false, "Visible");
+                    UpdateUI(grpGadgets, false);
                 }
-                else if (build.Region == "NTSC March 17")
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCOfficialPlayStationMagazineDemoDisc089])
                 {
-                    UpdateUI(chkToggleUndetectable, false);
-                    UpdateUI(chkToggleInvulnerable, false);
-                    UpdateUI(btnToggleGadgets, false);
-                    UpdateUI(chkInfiniteGadgetPower, false);
-                    UpdateUI(grpGadgets, false, "Visible");
-                }
-                else if (build.Region == "NTSC PlayStation Magazine Demo Disc 089")
-                {
-                    UpdateUI(chkToggleUndetectable, false);
                     UpdateUI(chkToggleInvulnerable, false);
                 }
-                else if (build.Region == "NTSC July 11")
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.PALDemoJuly27])
                 {
-                    UpdateUI(chkToggleUndetectable, false);
+                    UpdateUI(chkToggleInvulnerable, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoRatchetClankUpYourArsenal])
+                {
+                    UpdateUI(chkToggleInvulnerable, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.PALDemoRatchetClank3])
+                {
+                    UpdateUI(chkToggleInvulnerable, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoRatchetClankUpYourArsenalAugust11])
+                {
+                    UpdateUI(chkToggleInvulnerable, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCMarch17])
+                {
+                    UpdateUI(chkToggleInvulnerable, false);
+                    UpdateUI(grpGadgets, false);
+                    UpdateUI(chkGadgetInfinitePower, false);
+                    UpdateUI(btnGadgetToggleAll, false);
+                }
+                else if (build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCJuly11])
+                {
                     UpdateUI(chkToggleInvulnerable, false);
                 }
             }
@@ -349,39 +368,15 @@ namespace SlyMultiTrainer
                 ShowTab("DAG");
                 ShowTab("Entities");
                 UpdateUI(lblHealth, "Health");
-                UpdateUI(chkInfiniteGadgetPower, true);
                 UpdateUI(lblLuckyCharms, false);
                 UpdateUI(cmbLuckyCharms, false);
                 UpdateUI(chkLuckyCharmsFreeze, false);
-                UpdateUI(btnLoadLevelFull, true);
-                UpdateUI(btnSkipCurrentDialogue, false);
-                UpdateUI(chkDisableGuardAI, true);
-                UpdateUI(chkToggleInfDbJump, true);
-                UpdateUI(grpGadgets, true, "Visible");
-                UpdateUI(btnToggleThiefMoves, false);
-
-                if (build.Region == "NTSC E3 Demo")
-                {
-                    UpdateUI(chkDisableDeathBarrier, false);
-                    UpdateUI(chkToggleInvulnerable, false);
-                    UpdateUI(chkToggleUndetectable, false);
-                }
-                else
-                {
-                    UpdateUI(chkDisableDeathBarrier, true);
-                    UpdateUI(chkToggleInvulnerable, true);
-                    UpdateUI(chkToggleUndetectable, true);
-                }
             }
-
-            chkFOVFreeze.BackgroundImage = _iconFreezeDisabled;
-            chkClockFreeze.BackgroundImage = _iconFreezeDisabled;
-            chkDrawDistanceFreeze.BackgroundImage = _iconFreezeDisabled;
         }
 
         private void SetTxtAddresses()
         {
-            string tmp = "";
+            List<string> result = new();
             UpdateUI(txtAddresses, "");
             var fields = _game.GetType()
                               .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -395,7 +390,7 @@ namespace SlyMultiTrainer
                         continue;
                     }
 
-                    tmp += $"{field.Name} = {value}{Environment.NewLine}";
+                    result.Add($"{field.Name} = {value}");
                 }
                 else if (field.FieldType == typeof(DAG_t))
                 {
@@ -412,7 +407,7 @@ namespace SlyMultiTrainer
                                 continue;
                             }
 
-                            tmp += $"DAG.{dagField.Name} = {value}{Environment.NewLine}";
+                            result.Add($"DAG.{dagField.Name} = {value}");
                         }
                     }
                 }
@@ -431,17 +426,14 @@ namespace SlyMultiTrainer
                                 continue;
                             }
 
-                            tmp += $"Savefile.{savefileField.Name} = {value}{Environment.NewLine}";
+                            result.Add($"Savefile.{savefileField.Name} = {value}");
                         }
                     }
                 }
             }
 
-            if (tmp.EndsWith(Environment.NewLine))
-            {
-                tmp = tmp.TrimEnd('\r', '\n');
-            }
-
+            result.Sort();
+            var tmp = string.Join(Environment.NewLine, result.OrderBy(x => x.StartsWith("_")));
             UpdateUI(txtAddresses, tmp);
         }
 
@@ -456,8 +448,8 @@ namespace SlyMultiTrainer
                     continue;
                 }
 
-                if (processes[i].MainModule.ModuleName.StartsWith("pcsx2")
-                 || processes[i].MainModule.ModuleName.StartsWith("rpcs3"))
+                if (processes[i].ProcessName.StartsWith("pcsx2")
+                 || processes[i].ProcessName.StartsWith("rpcs3"))
                 {
                     Memory.Proc proc = new()
                     {
@@ -576,7 +568,7 @@ namespace SlyMultiTrainer
             }
             else if (sender is ComboBox comboBox)
             {
-                if (value is System.Collections.IList list && list.Count > 0)
+                if (value is System.Collections.IList list /*&& list.Count > 0*/)
                 {
                     UpdateUI(comboBox, list, "DataSource");
                 }
@@ -630,6 +622,13 @@ namespace SlyMultiTrainer
                     UpdateUI(form, (string)value, "Text");
                 }
             }
+            else if (sender is GroupBox groupBox)
+            {
+                if (value is bool)
+                {
+                    UpdateUI(groupBox, (bool)value, "Visible");
+                }
+            }
         }
 
         // Specific property
@@ -665,36 +664,33 @@ namespace SlyMultiTrainer
             });
         }
 
-        private void UncheckAllCheckboxes(Control.ControlCollection controls)
+        private void SetControlsToDefault(Control.ControlCollection controls)
         {
             foreach (Control control in controls)
             {
+                control.Visible = true;
+                control.Enabled = true;
                 if (control is CheckBox checkBox)
                 {
-                    UpdateUI(checkBox, false, "Checked");
+                    checkBox.Checked = false;
                 }
 
                 if (control.HasChildren)
                 {
-                    UncheckAllCheckboxes(control.Controls);
+                    SetControlsToDefault(control.Controls);
                 }
             }
         }
 
         #region Gadgets
-        private void btnToggleGadgets_Click(object sender, EventArgs e)
+        private void btnGadgetToggleAll_Click(object sender, EventArgs e)
         {
             _game.ToggleAllGadgets();
         }
 
-        private void btnToggleThiefMoves_Click(object sender, EventArgs e)
+        private void chkGadgetInfinitePower_CheckedChanged(object sender, EventArgs e)
         {
-            _game.ToggleAllGadgets();
-        }
-
-        private void chkInfiniteGadgetPower_CheckedChanged(object sender, EventArgs e)
-        {
-            if (chkInfiniteGadgetPower.Checked)
+            if (chkGadgetInfinitePower.Checked)
             {
                 _game.FreezeActCharGadgetPower(100);
             }
@@ -702,6 +698,13 @@ namespace SlyMultiTrainer
             {
                 _game.UnfreezeActCharGadgetPower();
             }
+        }
+
+        private void btnGadgetManage_Click(object sender, EventArgs e)
+        {
+            using FormGadgets f2 = new(_game);
+            f2.Icon = this.Icon;
+            f2.ShowDialog();
         }
 
         private void cmbGadgetL1_SelectionChangeCommitted(object sender, EventArgs e)
@@ -756,23 +759,26 @@ namespace SlyMultiTrainer
         #endregion
 
         #region Entities
-        private void ClearFKXTab()
+        private void ClearEntitiesTab()
         {
-            UpdateUI(lblFKXEntityInfo, Util.DefaultValueString);
-            UpdateUI(lblFKXEntityXCoord, Util.DefaultValueFloat);
-            UpdateUI(lblFKXEntityYCoord, Util.DefaultValueFloat);
-            UpdateUI(lblFKXEntityZCoord, Util.DefaultValueFloat);
-            UpdateUI(lblFKXEntityXCoordWorld, Util.DefaultValueFloat);
-            UpdateUI(lblFKXEntityYCoordWorld, Util.DefaultValueFloat);
-            UpdateUI(lblFKXEntityZCoordWorld, Util.DefaultValueFloat);
-            chkFKXEntityEditRotation.Checked = false;
-            chkFKXEntityEditRotation_CheckedChanged(chkFKXEntityEditRotation, EventArgs.Empty);
+            UpdateUI(lblEntitiesInfo, Util.DefaultValueString);
+            UpdateUI(lblEntitiesXCoord, Util.DefaultValueFloat);
+            UpdateUI(lblEntitiesYCoord, Util.DefaultValueFloat);
+            UpdateUI(lblEntitiesZCoord, Util.DefaultValueFloat);
+            UpdateUI(lblEntitiesZCoord, Util.DefaultValueFloat);
+            UpdateUI(lblEntitiesXCoordWorld, Util.DefaultValueFloat);
+            UpdateUI(lblEntitiesYCoordWorld, Util.DefaultValueFloat);
+            UpdateUI(lblEntitiesZCoordWorld, Util.DefaultValueFloat);
+            UpdateUI(chkEntitiesEditRotation, false, "Checked");
+            chkEntitiesEditRotation_CheckedChanged(chkEntitiesEditRotation, EventArgs.Empty);
         }
 
-        private void FillFKXTreeView(List<Util.FKXEntry_t> fkxList, string filter = "")
+        private void FillEntitiesTreeView(List<Util.FKXEntry_t> fkxList, string filter = "")
         {
             if (filter != "")
             {
+                // We filter based on the name
+                // Or the entity's address
                 List<Util.FKXEntry_t> filtered = new();
                 for (int i = 0; i < fkxList.Count; i++)
                 {
@@ -784,9 +790,10 @@ namespace SlyMultiTrainer
                     else if (item.Count > 0)
                     {
                         // Add the node if ANY of the entity addresses match
+                        string addressFilter = filter.TrimStart('0');
                         for (int j = 0; j < item.Count; j++)
                         {
-                            if (item.EntityAddress[j].ToString("X").Contains(filter, StringComparison.OrdinalIgnoreCase))
+                            if (item.EntityAddress[j].ToString("X").StartsWith(addressFilter, StringComparison.OrdinalIgnoreCase))
                             {
                                 filtered.Add(item);
                                 break;
@@ -798,13 +805,14 @@ namespace SlyMultiTrainer
                 fkxList = filtered;
             }
 
-            trvFKXList.BeginUpdate();
-            trvFKXList.Nodes.Clear();
+            trvEntitiesList.BeginUpdate();
+            trvEntitiesList.Nodes.Clear();
             for (int i = 0; i < fkxList.Count; i++)
             {
                 TreeNode node = new($"{fkxList[i].Name} ({fkxList[i].Count})");
                 node.Tag = fkxList[i];
-                trvFKXList.Nodes.Add(node);
+                node.Name = fkxList[i].Name;
+                trvEntitiesList.Nodes.Add(node);
 
                 if (fkxList[i].PoolPointer == 0x0)
                 {
@@ -820,10 +828,10 @@ namespace SlyMultiTrainer
                 }
             }
 
-            trvFKXList.EndUpdate();
+            trvEntitiesList.EndUpdate();
         }
 
-        public void btnRefreshFKXList_Click(object sender, EventArgs e)
+        public void btnEntitiesRefreshList_Click(object sender, EventArgs e)
         {
             List<Util.FKXEntry_t> fkxList = new();
             if (_game is Sly2Handler)
@@ -835,42 +843,76 @@ namespace SlyMultiTrainer
                 fkxList = (_game as Sly3Handler).GetFKXList();
             }
 
-            trvFKXList.Tag = fkxList;
-
-            FillFKXTreeView(fkxList);
-            ClearFKXTab();
+            trvEntitiesList.Tag = fkxList;
+            FillEntitiesTreeView(fkxList);
+            ClearEntitiesTab();
             txtEntitiesSearch.Text = "";
             txtEntitiesSearch.PlaceholderText = $"Search through {fkxList.Count} entities";
+
+            // Automatically select active character
+            bool selectActiveCharacter = Properties.Settings.Default.EntitiesSelectActChar;
+            if (selectActiveCharacter && _game.ActiveCharacter != null)
+            {
+                var actChar = trvEntitiesList.Nodes[_game.ActiveCharacter.InternalName];
+                if (actChar != null)
+                {
+                    trvEntitiesList.SelectedNode = actChar.FirstNode;
+
+                    // Bring the active character node to the center if possible
+                    // (e.g. not the case for sly 2 ep1 hub for bentley as he appears too early in the list)
+                    int visibleCount = trvEntitiesList.Height / trvEntitiesList.ItemHeight;
+                    int half = visibleCount / 2;
+                    TreeNode topNode = trvEntitiesList.SelectedNode;
+                    for (int i = 0; i < half; i++)
+                    {
+                        if (topNode.PrevVisibleNode == null)
+                        {
+                            break;
+                        }
+
+                        topNode = topNode.PrevVisibleNode;
+                    }
+
+                    trvEntitiesList.TopNode = topNode;
+                }
+            }
+
+            txtEntitiesSearch.Focus();
         }
 
         private void txtEntitiesSearch_TextChanged(object sender, EventArgs e)
         {
-            List<Util.FKXEntry_t> fkxList = trvFKXList.Tag as List<Util.FKXEntry_t>;
-            FillFKXTreeView(fkxList, txtEntitiesSearch.Text);
-            ClearFKXTab();
+            List<Util.FKXEntry_t> fkxList = trvEntitiesList.Tag as List<Util.FKXEntry_t>;
+            if (fkxList is null)
+            {
+                return;
+            }
+
+            FillEntitiesTreeView(fkxList, txtEntitiesSearch.Text);
+            ClearEntitiesTab();
         }
 
-        private void trvFKXList_AfterSelect(object sender, TreeViewEventArgs e)
+        private void trvEntitiesList_AfterSelect(object sender, TreeViewEventArgs e)
         {
             if (e.Node.Tag is string)
             {
                 // npc_boar_guard[0] = EF45B0
-                UpdateUI(lblFKXEntityInfo, $"{(e.Node.Parent.Tag as Util.FKXEntry_t).Name}[{e.Node.Index}] = {e.Node.Tag}");
+                UpdateUI(lblEntitiesInfo, $"{(e.Node.Parent.Tag as Util.FKXEntry_t).Name}[{e.Node.Index}] = {e.Node.Tag}");
                 return;
             }
 
             if (e.Node.Tag is Util.FKXEntry_t)
             {
-                ClearFKXTab();
+                ClearEntitiesTab();
 
                 // npc_boar_guard = 48D110
-                UpdateUI(lblFKXEntityInfo, $"{(e.Node.Tag as Util.FKXEntry_t).Name} = {(e.Node.Tag as Util.FKXEntry_t).Address}");
+                UpdateUI(lblEntitiesInfo, $"{(e.Node.Tag as Util.FKXEntry_t).Name} = {(e.Node.Tag as Util.FKXEntry_t).Address}");
             }
         }
 
-        public int GetPointerToEntityFromSelectedFKXNode()
+        public int GetPointerToEntityFromSelectedEntitiesNode()
         {
-            var node = trvFKXList.SelectedNode;
+            var node = trvEntitiesList.SelectedNode;
             if (node == null || node.Tag is not string)
             {
                 return 0;
@@ -881,26 +923,26 @@ namespace SlyMultiTrainer
             return pointerToEntity;
         }
 
-        private void btnCopyFKXEntityPointer_Click(object sender, EventArgs e)
+        private void btnEntitiesCopyAddress_Click(object sender, EventArgs e)
         {
-            if (trvFKXList.SelectedNode == null)
+            if (trvEntitiesList.SelectedNode == null)
             {
                 return;
             }
 
-            if (trvFKXList.SelectedNode.Tag is string)
+            if (trvEntitiesList.SelectedNode.Tag is string)
             {
-                Clipboard.SetText(trvFKXList.SelectedNode.Tag.ToString());
+                Clipboard.SetText(trvEntitiesList.SelectedNode.Tag.ToString());
             }
-            else if (trvFKXList.SelectedNode.Tag is Util.FKXEntry_t)
+            else if (trvEntitiesList.SelectedNode.Tag is Util.FKXEntry_t)
             {
-                Clipboard.SetText((trvFKXList.SelectedNode.Tag as Util.FKXEntry_t).Address);
+                Clipboard.SetText((trvEntitiesList.SelectedNode.Tag as Util.FKXEntry_t).Address);
             }
         }
 
-        private Vector3 GetCurrentFKXEntityPosition(out string pointerToEntity)
+        private Vector3 GetTranslationFromSelectedEntitiesNode(out string pointerToEntity)
         {
-            int value = GetPointerToEntityFromSelectedFKXNode();
+            int value = GetPointerToEntityFromSelectedEntitiesNode();
             pointerToEntity = value.ToString("X");
             if (value == 0)
             {
@@ -911,29 +953,29 @@ namespace SlyMultiTrainer
             return trans;
         }
 
-        private void btnFKXEntityXCoordMinus_Click(object sender, EventArgs e)
+        private void btnEntitiesXCoordMinus_Click(object sender, EventArgs e)
         {
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
-            trans.X -= Util.DefaultAmountToIncreaseOrDecreaseTranslationForFKXEntity;
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
+            trans.X -= Util.AmountToIncreaseOrDecreaseTranslationForFKXEntity;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void btnFKXEntityXCoordPlus_Click(object sender, EventArgs e)
+        private void btnEntitiesXCoordPlus_Click(object sender, EventArgs e)
         {
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
-            trans.X += Util.DefaultAmountToIncreaseOrDecreaseTranslationForFKXEntity;
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
+            trans.X += Util.AmountToIncreaseOrDecreaseTranslationForFKXEntity;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void chkFKXEntityXCoordFreeze_CheckedChanged(object sender, EventArgs e)
+        private void chkEntitiesXCoordFreeze_CheckedChanged(object sender, EventArgs e)
         {
-            int pointerToEntity = GetPointerToEntityFromSelectedFKXNode();
+            int pointerToEntity = GetPointerToEntityFromSelectedEntitiesNode();
             if (pointerToEntity == 0)
             {
                 return;
             }
 
-            if (chkFKXEntityXCoordFreeze.Checked)
+            if (chkEntitiesXCoordFreeze.Checked)
             {
                 _game.FreezeEntityLocalTranslationX(pointerToEntity.ToString("X"));
             }
@@ -943,37 +985,37 @@ namespace SlyMultiTrainer
             }
         }
 
-        private void btnFKXEntityXCoordSet_Click(object sender, EventArgs e)
+        private void btnEntitiesXCoordSet_Click(object sender, EventArgs e)
         {
-            float.TryParse(txtFKXEntityXCoordSet.Text, CultureInfo.InvariantCulture, out float value);
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
+            float.TryParse(txtEntitiesXCoordSet.Text, CultureInfo.InvariantCulture, out float value);
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
             trans.X = value;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void btnFKXEntityYCoordMinus_Click(object sender, EventArgs e)
+        private void btnEntitiesYCoordMinus_Click(object sender, EventArgs e)
         {
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
-            trans.Y -= Util.DefaultAmountToIncreaseOrDecreaseTranslationForFKXEntity;
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
+            trans.Y -= Util.AmountToIncreaseOrDecreaseTranslationForFKXEntity;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void btnFKXEntityYCoordPlus_Click(object sender, EventArgs e)
+        private void btnEntitiesYCoordPlus_Click(object sender, EventArgs e)
         {
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
-            trans.Y += Util.DefaultAmountToIncreaseOrDecreaseTranslationForFKXEntity;
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
+            trans.Y += Util.AmountToIncreaseOrDecreaseTranslationForFKXEntity;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void chkFKXEntityYCoordFreeze_CheckedChanged(object sender, EventArgs e)
+        private void chkEntitiesYCoordFreeze_CheckedChanged(object sender, EventArgs e)
         {
-            int pointerToEntity = GetPointerToEntityFromSelectedFKXNode();
+            int pointerToEntity = GetPointerToEntityFromSelectedEntitiesNode();
             if (pointerToEntity == 0)
             {
                 return;
             }
 
-            if (chkFKXEntityYCoordFreeze.Checked)
+            if (chkEntitiesYCoordFreeze.Checked)
             {
                 _game.FreezeEntityLocalTranslationY(pointerToEntity.ToString("X"));
             }
@@ -983,37 +1025,37 @@ namespace SlyMultiTrainer
             }
         }
 
-        private void btnFKXEntityYCoordSet_Click(object sender, EventArgs e)
+        private void btnEntitiesYCoordSet_Click(object sender, EventArgs e)
         {
-            float.TryParse(txtFKXEntityYCoordSet.Text, CultureInfo.InvariantCulture, out float value);
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
+            float.TryParse(txtEntitiesYCoordSet.Text, CultureInfo.InvariantCulture, out float value);
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
             trans.Y = value;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void btnFKXEntityZCoordMinus_Click(object sender, EventArgs e)
+        private void btnEntitiesZCoordMinus_Click(object sender, EventArgs e)
         {
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
-            trans.Z -= Util.DefaultAmountToIncreaseOrDecreaseTranslationForFKXEntity;
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
+            trans.Z -= Util.AmountToIncreaseOrDecreaseTranslationForFKXEntity;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void btnFKXEntityZCoordPlus_Click(object sender, EventArgs e)
+        private void btnEntitiesZCoordPlus_Click(object sender, EventArgs e)
         {
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
-            trans.Z += Util.DefaultAmountToIncreaseOrDecreaseTranslationForFKXEntity;
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
+            trans.Z += Util.AmountToIncreaseOrDecreaseTranslationForFKXEntity;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void chkFKXEntityZCoordFreeze_CheckedChanged(object sender, EventArgs e)
+        private void chkEntitiesZCoordFreeze_CheckedChanged(object sender, EventArgs e)
         {
-            int pointerToEntity = GetPointerToEntityFromSelectedFKXNode();
+            int pointerToEntity = GetPointerToEntityFromSelectedEntitiesNode();
             if (pointerToEntity == 0)
             {
                 return;
             }
 
-            if (chkFKXEntityZCoordFreeze.Checked)
+            if (chkEntitiesZCoordFreeze.Checked)
             {
                 _game.FreezeEntityLocalTranslationZ(pointerToEntity.ToString("X"));
             }
@@ -1023,78 +1065,79 @@ namespace SlyMultiTrainer
             }
         }
 
-        private void btnFKXEntityZCoordSet_Click(object sender, EventArgs e)
+        private void btnEntitiesZCoordSet_Click(object sender, EventArgs e)
         {
-            float.TryParse(txtFKXEntityZCoordSet.Text, CultureInfo.InvariantCulture, out float value);
-            Vector3 trans = GetCurrentFKXEntityPosition(out string pointerToEntity);
+            float.TryParse(txtEntitiesZCoordSet.Text, CultureInfo.InvariantCulture, out float value);
+            Vector3 trans = GetTranslationFromSelectedEntitiesNode(out string pointerToEntity);
             trans.Z = value;
             _game.WriteEntityLocalTranslation(pointerToEntity, trans);
         }
 
-        private void trkFKXEntityCoord_Scroll(object sender, EventArgs e)
+        private void trkEntitiesCoord_Scroll(object sender, EventArgs e)
         {
-            if (trkFKXEntityCoord.Value == 0)
+            if (trkEntitiesCoord.Value == 0)
             {
-                Util.DefaultAmountToIncreaseOrDecreaseTranslationForFKXEntity = 10;
+                Util.AmountToIncreaseOrDecreaseTranslationForFKXEntity = 10;
             }
             else
             {
-                Util.DefaultAmountToIncreaseOrDecreaseTranslationForFKXEntity = trkFKXEntityCoord.Value * 50;
+                Util.AmountToIncreaseOrDecreaseTranslationForFKXEntity = trkEntitiesCoord.Value * 50;
             }
         }
 
-        private void trkFKXEntityScale_Scroll(object sender, EventArgs e)
+        private void trkEntitiesScale_Scroll(object sender, EventArgs e)
         {
-            float trkValue = (float)trkFKXEntityScale.Value / 10;
-            int pointerToEntity = GetPointerToEntityFromSelectedFKXNode();
+            float trkValue = (float)trkEntitiesScale.Value / 10;
+            int pointerToEntity = GetPointerToEntityFromSelectedEntitiesNode();
             _game.WriteEntityLocalScale(pointerToEntity.ToString("X"), trkValue);
         }
 
-        private void btnFKXEntityScaleReset_Click(object sender, EventArgs e)
+        private void btnEntitiesScaleReset_Click(object sender, EventArgs e)
         {
-            trkFKXEntityScale.Value = 10;
-            trkFKXEntityScale_Scroll(trkFKXEntityScale, EventArgs.Empty);
+            trkEntitiesScale.Value = 10;
+            trkEntitiesScale_Scroll(trkEntitiesScale, EventArgs.Empty);
         }
 
-        private void chkFKXEntityEditRotation_CheckedChanged(object sender, EventArgs e)
+        private void chkEntitiesEditRotation_CheckedChanged(object sender, EventArgs e)
         {
-            trkFKXEntityRotationX.Enabled = chkFKXEntityEditRotation.Checked;
-            trkFKXEntityRotationY.Enabled = chkFKXEntityEditRotation.Checked;
-            trkFKXEntityRotationZ.Enabled = chkFKXEntityEditRotation.Checked;
+            trkEntitiesRotationX.Enabled = chkEntitiesEditRotation.Checked;
+            trkEntitiesRotationY.Enabled = chkEntitiesEditRotation.Checked;
+            trkEntitiesRotationZ.Enabled = chkEntitiesEditRotation.Checked;
         }
 
-        private void trkFKXEntityRotationX_Scroll(object sender, EventArgs e)
+        private void trkEntitiesRotationX_Scroll(object sender, EventArgs e)
         {
-            WriteRotationToSelectedFKXNode();
+            WriteRotationToSelectedEntitiesNode();
         }
 
-        private void trkFKXEntityRotationY_Scroll(object sender, EventArgs e)
+        private void trkEntitiesRotationY_Scroll(object sender, EventArgs e)
         {
-            WriteRotationToSelectedFKXNode();
+            WriteRotationToSelectedEntitiesNode();
         }
 
-        private void trkFKXEntityRotationZ_Scroll(object sender, EventArgs e)
+        private void trkEntitiesRotationZ_Scroll(object sender, EventArgs e)
         {
-            WriteRotationToSelectedFKXNode();
+            WriteRotationToSelectedEntitiesNode();
         }
 
-        private void WriteRotationToSelectedFKXNode()
+        private void WriteRotationToSelectedEntitiesNode()
         {
-            string pointerToEntity = GetPointerToEntityFromSelectedFKXNode().ToString("X");
+            string pointerToEntity = GetPointerToEntityFromSelectedEntitiesNode().ToString("X");
 
             // Degrees to radians
-            float radX = MathF.PI / 180f * trkFKXEntityRotationX.Value;
-            float radY = MathF.PI / 180f * trkFKXEntityRotationY.Value;
-            float radZ = MathF.PI / 180f * trkFKXEntityRotationZ.Value;
+            float radX = MathF.PI / 180f * trkEntitiesRotationX.Value;
+            float radY = MathF.PI / 180f * trkEntitiesRotationY.Value;
+            float radZ = MathF.PI / 180f * trkEntitiesRotationZ.Value;
 
             Matrix4x4 rotationMatrix = Matrix4x4.CreateRotationX(radX) * Matrix4x4.CreateRotationY(radY) * Matrix4x4.CreateRotationZ(radZ);
             rotationMatrix.Translation = _game.ReadEntityWorldTransformation(pointerToEntity).Translation;
             _game.WriteEntityWorldTransformation(pointerToEntity, rotationMatrix);
         }
 
-        private void btnFKXEntityWarpActChar_Click(object sender, EventArgs e)
+        private void btnEntitiesWarpActCharToEntity_Click(object sender, EventArgs e)
         {
-            int pointerToEntity = GetPointerToEntityFromSelectedFKXNode();
+            // Act char to entity
+            int pointerToEntity = GetPointerToEntityFromSelectedEntitiesNode();
             if (pointerToEntity == 0)
             {
                 return;
@@ -1104,9 +1147,10 @@ namespace SlyMultiTrainer
             _game.ResetCamera();
         }
 
-        private void btnFKXEntityWarpEntity_Click(object sender, EventArgs e)
+        private void btnEntitiesWarpEntityToActChar_Click(object sender, EventArgs e)
         {
-            int pointerToEntity = GetPointerToEntityFromSelectedFKXNode();
+            // Entity to act char
+            int pointerToEntity = GetPointerToEntityFromSelectedEntitiesNode();
             if (pointerToEntity == 0)
             {
                 return;
@@ -1114,20 +1158,37 @@ namespace SlyMultiTrainer
 
             _game.WarpSourceEntityToDestEntity(pointerToEntity.ToString("X"), "");
         }
+
+        private void btnEntitiesWarp_Click(object sender, EventArgs e)
+        {
+            int pointerToEntity = GetPointerToEntityFromSelectedEntitiesNode();
+            if (pointerToEntity == 0)
+            {
+                return;
+            }
+
+            Util.Warp_t warp = (Util.Warp_t)cmbEntitiesWarps.SelectedItem;
+            if (warp == null)
+            {
+                return;
+            }
+
+            _game.WarpSourceEntityToPoint(pointerToEntity.ToString("X"), warp.Transformation);
+        }
         #endregion
 
         #region Active character
         private void btnActCharHealthMinus_Click(object sender, EventArgs e)
         {
             int health = _game.ReadActCharHealth();
-            health -= Util.DefaultAmountToIncreaseOrDecreaseHealth;
+            health -= Util.AmountToIncreaseOrDecreaseHealth;
             _game.WriteActCharHealth(health);
         }
 
         private void btnActCharHealthPlus_Click(object sender, EventArgs e)
         {
             int health = _game.ReadActCharHealth();
-            health += Util.DefaultAmountToIncreaseOrDecreaseHealth;
+            health += Util.AmountToIncreaseOrDecreaseHealth;
             _game.WriteActCharHealth(health);
         }
 
@@ -1143,8 +1204,19 @@ namespace SlyMultiTrainer
             }
         }
 
+        private void btnActCharHealthSet_Click(object sender, EventArgs e)
+        {
+            int.TryParse(txtActCharHealthSet.Text, CultureInfo.InvariantCulture, out int value);
+            _game.WriteActCharHealth(value);
+        }
+
         private void chkLuckyCharmsFreeze_CheckedChanged(object sender, EventArgs e)
         {
+            if (_game is not Sly1Handler)
+            {
+                return;
+            }
+
             if (chkLuckyCharmsFreeze.Checked)
             {
                 (_game as Sly1Handler).FreezeLuckyCharms();
@@ -1163,14 +1235,14 @@ namespace SlyMultiTrainer
         private void btnActCharXCoordMinus_Click(object sender, EventArgs e)
         {
             Vector3 value = _game.ReadActCharLocalTranslation();
-            value.X -= Util.DefaultAmountToIncreaseOrDecreaseTranslationForActChar;
+            value.X -= Util.AmountToIncreaseOrDecreaseTranslationForActChar;
             _game.WriteActCharLocalTranslation(value);
         }
 
         private void btnActCharXCoordPlus_Click(object sender, EventArgs e)
         {
             Vector3 value = _game.ReadActCharLocalTranslation();
-            value.X += Util.DefaultAmountToIncreaseOrDecreaseTranslationForActChar;
+            value.X += Util.AmountToIncreaseOrDecreaseTranslationForActChar;
             _game.WriteActCharLocalTranslation(value);
         }
 
@@ -1189,14 +1261,14 @@ namespace SlyMultiTrainer
         private void btnActCharYCoordMinus_Click(object sender, EventArgs e)
         {
             Vector3 value = _game.ReadActCharLocalTranslation();
-            value.Y -= Util.DefaultAmountToIncreaseOrDecreaseTranslationForActChar;
+            value.Y -= Util.AmountToIncreaseOrDecreaseTranslationForActChar;
             _game.WriteActCharLocalTranslation(value);
         }
 
         private void btnActCharYCoordPlus_Click(object sender, EventArgs e)
         {
             Vector3 value = _game.ReadActCharLocalTranslation();
-            value.Y += Util.DefaultAmountToIncreaseOrDecreaseTranslationForActChar;
+            value.Y += Util.AmountToIncreaseOrDecreaseTranslationForActChar;
             _game.WriteActCharLocalTranslation(value);
         }
 
@@ -1215,14 +1287,14 @@ namespace SlyMultiTrainer
         private void btnActCharZCoordMinus_Click(object sender, EventArgs e)
         {
             Vector3 value = _game.ReadActCharLocalTranslation();
-            value.Z -= Util.DefaultAmountToIncreaseOrDecreaseTranslationForActChar;
+            value.Z -= Util.AmountToIncreaseOrDecreaseTranslationForActChar;
             _game.WriteActCharLocalTranslation(value);
         }
 
         private void btnActCharZCoordPlus_Click(object sender, EventArgs e)
         {
             Vector3 value = _game.ReadActCharLocalTranslation();
-            value.Z += Util.DefaultAmountToIncreaseOrDecreaseTranslationForActChar;
+            value.Z += Util.AmountToIncreaseOrDecreaseTranslationForActChar;
             _game.WriteActCharLocalTranslation(value);
         }
 
@@ -1266,11 +1338,11 @@ namespace SlyMultiTrainer
         {
             if (trkActCharCoord.Value == 0)
             {
-                Util.DefaultAmountToIncreaseOrDecreaseTranslationForActChar = 10;
+                Util.AmountToIncreaseOrDecreaseTranslationForActChar = 10;
             }
             else
             {
-                Util.DefaultAmountToIncreaseOrDecreaseTranslationForActChar = trkActCharCoord.Value * 50;
+                Util.AmountToIncreaseOrDecreaseTranslationForActChar = trkActCharCoord.Value * 50;
             }
         }
 
@@ -1324,9 +1396,19 @@ namespace SlyMultiTrainer
                 return;
             }
 
-            float.TryParse(coords[0], CultureInfo.InvariantCulture, out float value1);
-            float.TryParse(coords[1], CultureInfo.InvariantCulture, out float value2);
-            float.TryParse(coords[2], CultureInfo.InvariantCulture, out float value3);
+            // Sometimes when you copy the 3 floats from cheat engine's memory viewer, it has commas instead of periods
+            for (int i = 0; i < 3; i++)
+            {
+                string input = coords[i].Trim();
+                if (input.Contains(',') && !input.Contains('.'))
+                {
+                    coords[i] = input.Replace(',', '.');
+                }
+            }
+
+            float.TryParse(coords[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float value1);
+            float.TryParse(coords[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float value2);
+            float.TryParse(coords[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float value3);
             txtActCharXCoordSet.Text = value1.ToString();
             txtActCharYCoordSet.Text = value2.ToString();
             txtActCharZCoordSet.Text = value3.ToString();
@@ -1339,6 +1421,13 @@ namespace SlyMultiTrainer
             float.TryParse(txtActCharZCoordSet.Text, CultureInfo.InvariantCulture, out float value3);
             Vector3 trans = new(value1, value2, value3);
             _game.WriteActCharLocalTranslation(trans);
+        }
+
+        private void ToolStripMenuItemActCharAddCustomWarp_Click(object sender, EventArgs e)
+        {
+            using FormCustomWarps f2 = new(_game);
+            f2.Icon = this.Icon;
+            f2.ShowDialog();
         }
 
         private void chkActCharFly_CheckedChanged(object sender, EventArgs e)
@@ -1366,7 +1455,7 @@ namespace SlyMultiTrainer
                 return;
             }
 
-            _game.WarpSourceEntityToPoint("", warp.Position);
+            _game.WarpSourceEntityToPoint("", warp.Transformation);
             _game.ResetCamera();
         }
         #endregion
@@ -1387,14 +1476,14 @@ namespace SlyMultiTrainer
             _game.ToggleInfiniteDbJump(chkToggleInfDbJump.Checked);
         }
 
+        private void chkToggleNoclip_CheckedChanged(object sender, EventArgs e)
+        {
+            _game.ToggleNoclip(chkToggleNoclip.Checked);
+        }
+
         private void chkDisableGuardAI_CheckedChanged(object sender, EventArgs e)
         {
             _game.ToggleGuardAI(chkDisableGuardAI.Checked);
-        }
-
-        private void chkDisableDeathBarrier_CheckedChanged(object sender, EventArgs e)
-        {
-            (_game as Sly3Handler).ToggleDeathBarriers(chkDisableDeathBarrier.Checked);
         }
         #endregion
 
@@ -1492,34 +1581,60 @@ namespace SlyMultiTrainer
         #endregion
 
         #region Maps
-        private void btnLoadLevel_Click(object sender, EventArgs e)
+        private void btnLoadMap_Click(object sender, EventArgs e)
         {
             var mapId = Util.GetOriginalMapId(cmbMaps);
 
             // Current map
             if (mapId == -1)
             {
-                mapId = _game.GetMapId();
+                mapId = _game.ReadMapId();
             }
 
             if (_game is Sly1Handler)
             {
-                _game.LoadMap(mapId);
+                int entranceValue = 0x1BC;
+                if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemo])
+                {
+                    entranceValue = 0x196;
+                }
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoJune14])
+                {
+                    entranceValue = 0x1B3;
+                }
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.PALDemoPlayStationExperience])
+                {
+                    entranceValue = 0x196;
+                }
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCMay19])
+                {
+                    entranceValue = 0x19D;
+                }
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCMay21])
+                {
+                    entranceValue = 0x19D;
+                }
+
+                _game.LoadMap(mapId, entranceValue);
             }
             else if (_game is Sly2Handler)
             {
                 int entranceValue = 0x189;
-                if (_game.Region == "NTSC July 11")
+                if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCJuly11])
                 {
                     entranceValue = 0x193;
                 }
-                else if (_game.Region == "NTSC E3 Demo")
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCE3Demo])
                 {
                     entranceValue = 0x17A;
                 }
-                else if (_game.Region == "NTSC March 17")
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCMarch17])
                 {
                     entranceValue = 0x171;
+                }
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoRatchetClankUpYourArsenalAugust11])
+                {
+                    entranceValue = 0x194;
                 }
 
                 _game.LoadMap(mapId, entranceValue);
@@ -1527,19 +1642,19 @@ namespace SlyMultiTrainer
             else if (_game is Sly3Handler)
             {
                 int entranceValue = 0x1A8;
-                if (_game.Region == "NTSC July 16")
+                if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCJuly16])
                 {
                     entranceValue = 0x1A2;
                 }
-                else if (_game.Region == "PAL August 2")
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.PALAugust2])
                 {
                     entranceValue = 0x1A6;
                 }
-                else if (_game.Region == "NTSC E3 Demo")
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoApril18])
                 {
                     entranceValue = 0x19B;
                 }
-                else if (_game.Region == "NTSC Regular Demo")
+                else if (_game.Build.Region == Util.BuildRegions[Util.BUILD_NAME.NTSCDemoJuly7])
                 {
                     entranceValue = 0x1A2;
                 }
@@ -1548,14 +1663,14 @@ namespace SlyMultiTrainer
             }
         }
 
-        private void btnLoadLevelFull_Click(object sender, EventArgs e)
+        private void btnLoadMapFull_Click(object sender, EventArgs e)
         {
             var mapId = Util.GetOriginalMapId(cmbMaps);
 
-            // current map
+            // Current map
             if (mapId == -1)
             {
-                mapId = _game.GetMapId();
+                mapId = _game.ReadMapId();
             }
 
             (_game as Sly3Handler).LoadMapFull(mapId);
@@ -1564,7 +1679,7 @@ namespace SlyMultiTrainer
 
         private void btnSkipCurrentDialogue_Click(object sender, EventArgs e)
         {
-            (_game as Sly1Handler).SkipCurrentDialogue();
+            _game.SkipCurrentDialogue();
         }
 
         private void tabControlMain_SelectedIndexChanged(object sender, EventArgs e)
@@ -1589,6 +1704,20 @@ namespace SlyMultiTrainer
             }
         }
 
+        private void chkStringsMonospaceFont_CheckedChanged(object sender, EventArgs e)
+        {
+            if (chkStringsMonospaceFont.Checked)
+            {
+                txtStringsLocalized.Font = _monospaceFont;
+                txtStringsSavefile.Font = _monospaceFont;
+            }
+            else
+            {
+                txtStringsLocalized.Font = txtStringsLocalized.Parent.Font;
+                txtStringsSavefile.Font = txtStringsSavefile.Parent.Font;
+            }
+        }
+
         private void btnReattach_Click(object sender, EventArgs e)
         {
             _triggerReattach = true;
@@ -1598,7 +1727,17 @@ namespace SlyMultiTrainer
         {
             using FormSettings f2 = new();
             f2.Icon = this.Icon;
-            f2.ShowDialog();
+            if (f2.ShowDialog() != DialogResult.OK)
+            {
+                return;
+            }
+
+            // Don't refresh warps if no game is attached
+            if (_game is not null)
+            {
+                int currentMapId = _game.ReadMapId() + 1;
+                _game.RefreshWarps(currentMapId);
+            }
         }
 
         private void cmbProcesses_SelectionChangeCommitted(object sender, EventArgs e)

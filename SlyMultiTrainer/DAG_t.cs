@@ -21,7 +21,6 @@ namespace SlyMultiTrainer
         public string ClusterIdAddress = "";
         public string Sly3Time = "";
         public string Sly3Flag = "";
-        public string OffsetNextNodePointer = "";
         public string OffsetState = "";
         public string OffsetFocusCount = "";
         public string OffsetCompleteCount = "";
@@ -33,6 +32,7 @@ namespace SlyMultiTrainer
         public string OffsetCheckpointEntranceValue = ""; // Entrance value of the checkpoint
         public string OffsetAttributes = "";
         public string OffsetAttributesForCluster = "";
+        public string OffsetVerticalLayer = "";
         public int AttributeCountForTask = 0;
 
         public Func<int, string> GetStringFromId;
@@ -54,6 +54,7 @@ namespace SlyMultiTrainer
         // Store the current zoom and pan before refreshing
         private bool _lockPanAndZoomOnRefresh = false;
         private Microsoft.Msagl.Core.Geometry.Curves.PlaneTransformation _oldTransform;
+        private Font _boldFont;
 
         public DAG_t(Memory.Mem m)
         {
@@ -63,11 +64,13 @@ namespace SlyMultiTrainer
             Viewer.ToolBarIsVisible = false;
             Viewer.Dock = DockStyle.Fill;
             Viewer.OutsideAreaBrush = Brushes.White;
-            Viewer.MouseClick += DAGViewer_MouseClick;
-            Viewer.MouseDoubleClick += DAGViewer_MouseDoubleClick;
+            Viewer.MouseClick += Viewer_MouseClick;
+            Viewer.MouseDoubleClick += Viewer_MouseDoubleClick;
+            Viewer.KeyUp += Viewer_KeyUp;
             Tasks = new();
             Clusters = new();
             _m = m;
+            _boldFont = new Font(SystemFonts.MenuFont, System.Drawing.FontStyle.Bold);
         }
 
         public void Init(Sly2_3_Savefile savefile)
@@ -104,8 +107,8 @@ namespace SlyMultiTrainer
             // This way we fix sly 2 ep3, in which there's a floating node not attached to the dag
             for (int i = 0; i < Tasks.Count; i++)
             {
-                string nextNodeAddress = _m.ReadInt($"{Tasks[i].Address}+{OffsetNextNodePointer}").ToString("X");
-                
+                string nextNodeAddress = _m.ReadInt($"{Tasks[i].Address}+20").ToString("X");
+
                 // The nextNode field is 0 when it's the last task ("t1_complete")
                 if (nextNodeAddress != "0")
                 {
@@ -122,9 +125,19 @@ namespace SlyMultiTrainer
                     if (!found)
                     {
                         // not parsed
-                        ReadTask($"{Tasks[i].Address}+{OffsetNextNodePointer}");
+                        ReadTask($"{Tasks[i].Address}+20");
                     }
                 }
+            }
+
+            // We sort tasks in "predecessors first" order to be able to properly walk through the dag during checkpoint loading
+            Tasks.Sort(SortTasks);
+
+            // While we're at it, we sort the clusters and tasks inside each cluster too
+            Clusters = Clusters.OrderBy(cluster => Tasks.FindIndex(task => task.Cluster == cluster)).ToList();
+            foreach (Cluster_t cluster in Clusters)
+            {
+                cluster.Tasks = cluster.Tasks.OrderBy(Tasks.IndexOf).ToList();
             }
         }
 
@@ -163,6 +176,7 @@ namespace SlyMultiTrainer
                         {
                             Tasks[i].Parent.Add(parentTask);
                         }
+
                         return Tasks[i];
                     }
                 }
@@ -172,7 +186,8 @@ namespace SlyMultiTrainer
             task.State = (STATE)_m.ReadInt($"{taskAddress}+{OffsetState}");
             task.FocusCount = _m.ReadInt($"{taskAddress}+{OffsetFocusCount}");
             task.CompleteCount = _m.ReadInt($"{taskAddress}+{OffsetCompleteCount}");
-
+            task.VerticalLayer = _m.ReadInt($"{taskAddress}+{OffsetVerticalLayer}");
+            task.VerticalLayerGroup = _m.ReadInt($"{taskAddress}+{OffsetVerticalLayer}+4");
             task.CheckpointEntranceValue = _m.ReadInt($"{taskAddress}+{OffsetCheckpointEntranceValue}");
             if (task.CheckpointEntranceValue != -1)
             {
@@ -188,14 +203,15 @@ namespace SlyMultiTrainer
             {
                 for (int i = 0; i < AttributeCountForTask; i++)
                 {
-                    SavefileAttribute_t attribute = new();
-                    attribute.Id = _m.ReadShort($"{taskAddress}+{OffsetAttributes}+{8 * i + 4:X},0");
-                    attribute.SubId = _m.ReadShort($"{taskAddress}+{OffsetAttributes}+{8 * i + 4:X},2");
-                    task.Attributes.Add(attribute);
+                    SavefileAttribute_t attr = new();
+                    attr.Id = _m.ReadShort($"{taskAddress}+{OffsetAttributes}+{8 * i + 4:X},0");
+                    attr.SubId = _m.ReadShort($"{taskAddress}+{OffsetAttributes}+{8 * i + 4:X},2");
+                    task.Attributes.Add(attr);
                 }
 
                 if (Version == DAG_VERSION.V0)
                 {
+                    // Sly 2 march has the first savefile value in the second attributes position
                     task.SavefileFlagsAddress = _savefile.GetSavefileAddress(task.Attributes[1].Id, task.Attributes[1].SubId);
                 }
                 else
@@ -204,7 +220,7 @@ namespace SlyMultiTrainer
                 }
 
                 // Name
-                task.Name = _savefile.SavefileKeyStringTable.GetValueOrDefault(task.Attributes[0].Id, "");
+                task.Name = _savefile.SavefileStringTable.GetValueOrDefault(task.Attributes[0].Id, "");
 
                 // Chalktalk detection, based on the name for now.
                 // Usually "tN_chalktalkM" or for some sly 3 tasks "tN_chalktalk_M"
@@ -291,6 +307,7 @@ namespace SlyMultiTrainer
 
                 if (Version == DAG_VERSION.V0)
                 {
+                    // Sly 2 march has the first savefile value in the second attributes position
                     cluster.SavefileFlagsAddress = _savefile.GetSavefileAddress(cluster.Attributes[1].Id, cluster.Attributes[1].SubId);
                 }
                 else
@@ -299,7 +316,7 @@ namespace SlyMultiTrainer
                 }
 
                 // Get the mission name (if any)
-                cluster.Name = _savefile.SavefileKeyStringTable.GetValueOrDefault(cluster.Attributes[0].Id, "");
+                cluster.Name = _savefile.SavefileStringTable.GetValueOrDefault(cluster.Attributes[0].Id, "");
 
                 if (Version != DAG_VERSION.V2)
                 {
@@ -326,6 +343,48 @@ namespace SlyMultiTrainer
             return true;
         }
 
+        private int SortTasks(Task_t task1, Task_t task2)
+        {
+            // From Sly 3 PAL September 2 at 0019B658
+            // Tasks are sorted in "predecessors first" order:
+            // 1) By VerticalLayerGroup
+            int result = task1.VerticalLayerGroup.CompareTo(task2.VerticalLayerGroup);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            // 2) By cluster's id
+            // NOTE: Tasks that are not part of a cluster have more priority than tasks that are part of a cluster
+            int clusterId1 = -1;
+            if (task1.Cluster.Address != "0")
+            {
+                clusterId1 = task1.Cluster.Id;
+            }
+
+            int clusterId2 = -1;
+            if (task2.Cluster.Address != "0")
+            {
+                clusterId2 = task2.Cluster.Id;
+            }
+
+            result = clusterId1.CompareTo(clusterId2);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            // 3) By VerticalLayer (for tasks in the same cluster or when both tasks are not part of any cluster)
+            result = task1.VerticalLayer.CompareTo(task2.VerticalLayer);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            // 4) By task's id (for tasks in the same vertical layer)
+            return task1.Id.CompareTo(task2.Id);
+        }
+
         public bool IsClusterEqualToCluster(Cluster_t cluster1, Cluster_t cluster2)
         {
             if (cluster1.Suck != cluster2.Suck)
@@ -349,13 +408,13 @@ namespace SlyMultiTrainer
                 value = $"0x{task.Address}";
             }
 
-            _m.WriteMemory($"{CurrentCheckpointNodePointer}", "int", value);
+            _m.WriteMemory($"{CurrentCheckpointNodePointer}", "int", $"{value}");
         }
 
         public void WriteClusterSuck(Cluster_t cluster, float suck)
         {
             cluster.Suck = suck;
-            _savefile.WriteSavefileValue(cluster.Name, "suck_value", "float", ((float)suck).ToString());
+            _savefile.WriteSavefileValue("float", ((float)suck).ToString(), cluster.Name, "suck_value");
         }
 
         public void WriteClusterState(Cluster_t cluster, STATE state)
@@ -365,7 +424,7 @@ namespace SlyMultiTrainer
                 for (int i = 0; i < cluster.Tasks.Count; i++)
                 {
                     WriteTaskState(cluster.Tasks[i], STATE.Unavailable);
-                    WriteTaskFocusAndCompleteCount(cluster.Tasks[0], 0, 0);
+                    WriteTaskFocusAndCompleteCount(cluster.Tasks[i], 0, 0);
                 }
             }
             else if (state == STATE.Available)
@@ -384,7 +443,7 @@ namespace SlyMultiTrainer
                 for (int i = 0; i < cluster.Tasks.Count; i++)
                 {
                     WriteTaskState(cluster.Tasks[i], STATE.Complete);
-                    WriteTaskFocusAndCompleteCount(cluster.Tasks[0], 1, 1);
+                    WriteTaskFocusAndCompleteCount(cluster.Tasks[i], 1, 1);
                 }
             }
             else if (state == STATE.Final)
@@ -392,7 +451,7 @@ namespace SlyMultiTrainer
                 for (int i = 0; i < cluster.Tasks.Count; i++)
                 {
                     WriteTaskState(cluster.Tasks[i], STATE.Final);
-                    WriteTaskFocusAndCompleteCount(cluster.Tasks[0], 1, 1);
+                    WriteTaskFocusAndCompleteCount(cluster.Tasks[i], 1, 1);
                 }
             }
         }
@@ -403,7 +462,7 @@ namespace SlyMultiTrainer
 
             if (alsoToSavefile)
             {
-                _savefile.WriteSavefileValue(task.Name, "state", "int", ((int)state).ToString());
+                _savefile.WriteSavefileValue("int", ((int)state).ToString(), task.Name, "state");
             }
         }
 
@@ -429,12 +488,11 @@ namespace SlyMultiTrainer
                 ];
             }
 
-            byte[] bytes = EndianBitConverter.ArrayToByteArray(tmp);
-            _m.WriteBytes($"{task.Address}+{OffsetFocusCount}", bytes);
-
+            string bytes = EndianBitConverter.ByteArrayToString(EndianBitConverter.ArrayToByteArray(tmp));
+            _m.WriteMemory($"{task.Address}+{OffsetFocusCount}", "bytes", bytes);
             if (alsoToSavefile)
             {
-                _savefile.WriteSavefileValue(task.Name, "focus_count", "bytes", EndianBitConverter.ByteArrayToString(bytes));
+                _savefile.WriteSavefileValue("bytes", bytes, task.Name, "focus_count");
             }
         }
 
@@ -520,15 +578,15 @@ namespace SlyMultiTrainer
 
             // - We start from "targetTask" and the desired state is "Available". "targetTask" is either the first node of a cluster or a specific checkpoint inside the cluster.
             // - We mark targetTask to be "Available" and we start walking backwards up until the root (node with no parents).
-            // - This goes against the "Stop when predecessor is already in desired state" point. Is Bruce assuming the dag is *always* in a valid state?
+            // - We go against the "Stop when predecessor is already in desired state" point. Is Bruce assuming the dag is *always* in a valid state?
             // - While we walk backwards we mark each node to be final (if we want to set targetTask to be available, it means everything before that must be final)
             // - NOTE: If a specific checkpoint was loaded, the tasks that come before targetTask AND that are part of the same cluster need to be marked as complete instead of final. We check for this later. For now, let's just mark all parents to be final
             // IMPORTANT: We manually go look for the root node. This fixes sly2 ep3 having more than 1 node with no parents (Sly 2 march ep3 has even more)
-            MarkTaskSavefileChangeBackward(targetTask, STATE.Available, out Task_t rootTask);
+            MarkTaskSavefileChangeBackward(targetTask, STATE.Available);
 
             // https://youtu.be/Yl20uIQ3fEw?t=1935 (32:15)
             // BRUCE:
-            // - Go through all tasks in "predecessors first" order
+            // - Go through all tasks in "predecessors first" order (we sorted the tasks already when we loaded the dag. Our tasks here are already in the correct order)
             //   - Set each task to its desired state
             //   - Recursively walk forward through successors
             //   - Skip tasks marked with a state
@@ -542,16 +600,22 @@ namespace SlyMultiTrainer
             MarkTaskSavefileChangeForward();
 
             // At this point all nodes in the dag have been marked with a desired state
-            // Let's now go through each task and get the array of 0x14 bytes that is going to be written to the savefile region
+            // Let's now go through each task and get the array of bytes that is going to be written to the savefile region
             List<(int Address, byte[] Values)> SavefileValues = new(Tasks.Count);
             for (int i = 0; i < Tasks.Count; i++)
             {
                 Task_t task = Tasks[i];
                 if (targetTask.Cluster == task.Cluster
-                    && task.StateSavefileChange == STATE.Final)
+                 && task.StateSavefileChange == STATE.Final)
                 {
                     // If we are loading a checkpoint which is not the first task of the cluster
                     // Then we need to set to complete the previous tasks, but only in this cluster
+                    
+                    // NOTE: This half goes against the debug menu:
+                    // loading a checkpoint that has tasks of the same cluster in the final state will keep them final
+                    // loading a checkpoint that has tasks of the same cluster NOT in the final state, will change them to complete
+                    
+                    // Our implementation here is to always change them to complete, no matter their current state
                     task.StateSavefileChange = STATE.Complete;
                 }
 
@@ -565,18 +629,20 @@ namespace SlyMultiTrainer
                     // So we also need to write the focus count to each task struct
                     // Unfortunately these memory writes will cost us some time
 
+                    // Assume the player has not been through that task (state is unavailable)
                     int focusCount = 0;
                     int completeCount = 0;
 
                     if (task.StateSavefileChange == STATE.Final
                      || task.StateSavefileChange == STATE.Complete)
                     {
+                        // The player has been through that task
                         focusCount = 1;
                         completeCount = 1;
                     }
                     else if (task == targetTask)
                     {
-                        // And for the "targetTask" we check if the user wants to load it with or without focus
+                        // And for the "targetTask" (the state is available) we check if the user wants to load it with or without focus
                         if (!withZeroFocus)
                         {
                             focusCount = 1;
@@ -588,14 +654,14 @@ namespace SlyMultiTrainer
                 }
             }
 
-            // Commit the desired state to the savefile
+            // Commit the desired dag state to the savefile
             List<(int Address, byte[] Values)> SavefileValuesToWrite = SavefileValues.Order().ToList();
             int toSkip = 0;
             int toTake = SavefileValuesToWrite.Count;
             if (Version >= DAG_VERSION.V2)
             {
                 // The optimization only works for sly 3 in ep1 and 2. For ep3, 4 and 5, the sequence breaks.
-                // For example, in ep3 day2, the 0x14 values at 46BAB8 come from the offset 0x2D88, which comes from the Id 0x29C and SubId 0x56. But the task with that attribute is from ep5
+                // For example, in ep3 day2, the 0x14 values at 46BAB8 come from the offset 0x2D88, which comes from the Id 0x29C and SubId 0x56. But the task with that attribute (t3_quiet_kill_purchase_query) is from ep5
                 // So, we detect when the next array of 0x14 bytes is not at +0x14 of the current address and we break up the values to write into pieces
                 toTake = 0;
                 for (int i = 0; i < SavefileValuesToWrite.Count; i++)
@@ -617,7 +683,7 @@ namespace SlyMultiTrainer
                                 .Select(t => t.Values)
                                 .SelectMany(b => b)
                                 .ToArray();
-                        _m.WriteBytes($"{SavefileValuesToWrite[toSkip].Address:X}", flags);
+                        _m.WriteMemory($"{SavefileValuesToWrite[toSkip].Address:X}", "bytes", EndianBitConverter.ByteArrayToString(flags));
                         toSkip = i + 1;
                         toTake = toTake + tmp;
                     }
@@ -630,12 +696,12 @@ namespace SlyMultiTrainer
                             .Select(t => t.Values)
                             .SelectMany(b => b)
                             .ToArray();
-            _m.WriteBytes($"{SavefileValuesToWrite[toSkip].Address:X}", flags2);
+            _m.WriteMemory($"{SavefileValuesToWrite[toSkip].Address:X}", "bytes", EndianBitConverter.ByteArrayToString(flags2));
 
             List<int> NodeIds =
             [
                 targetTask.Cluster.Id, // Job id
-                targetTask.Id, // Unknown, might be "last task made available"
+                targetTask.Id, // Last task that got the focus
                 targetTask.Id // Checkpoint id
             ];
 
@@ -646,7 +712,7 @@ namespace SlyMultiTrainer
                 NodeIds.Add(0);
             }
 
-            _m.WriteBytes($"{ClusterIdAddress}", EndianBitConverter.ArrayToByteArray(NodeIds.ToArray()));
+            _m.WriteMemory($"{ClusterIdAddress}", "bytes", EndianBitConverter.ByteArrayToString(EndianBitConverter.ArrayToByteArray(NodeIds.ToArray())));
 
             // Entity
             WriteActCharId(targetTask.EntityId, targetTask.EntityId2);
@@ -655,12 +721,12 @@ namespace SlyMultiTrainer
             int mode = 0;
             if (Version == DAG_VERSION.V3)
             {
-                // From sly 3 sept proto at 0019adb0
+                // From Sly 3 PAL September 2 at 0019ADB0
                 int time = _m.ReadInt($"{Sly3Time}");
                 int flag = _m.ReadInt($"{Sly3Time}+F0");
                 int flag2 = _m.ReadInt($"{Sly3Flag}"); // reload address - 70
                 int timeTask = _m.ReadInt($"{targetTask.Address}+C0"); // 0xC = day1, else day2
-
+                
                 if (flag2 > 1)
                 {
                     if ((timeTask == time) && (flag != 0x0))
@@ -762,21 +828,25 @@ namespace SlyMultiTrainer
             task.StateSavefileChange = state;
         }
 
-        private void MarkTaskSavefileChangeBackward(Task_t task, STATE state, out Task_t rootTask)
+        private void MarkTaskSavefileChangeBackward(Task_t task, STATE state)
         {
-            rootTask = null;
+            if (task.IsMarkedForSavefileChange)
+            {
+                return;
+            }
 
             MarkTaskSavefileChange(task, state);
 
+            // We go against the "Stop when predecessor is already in desired state" point. Is Bruce assuming the dag is *always* in a valid state?
+            // Just return when we reached the root
             if (/*task.State == state ||*/ task.Parent.Count == 0)
             {
-                rootTask = task;
                 return;
             }
 
             for (int i = 0; i < task.Parent.Count; i++)
             {
-                MarkTaskSavefileChangeBackward(task.Parent[i], STATE.Final, out rootTask);
+                MarkTaskSavefileChangeBackward(task.Parent[i], STATE.Final);
             }
         }
 
@@ -793,7 +863,17 @@ namespace SlyMultiTrainer
 
                 if (task.Parent.All(x => x.IsMarkedForSavefileChange && x.StateSavefileChange == STATE.Final))
                 {
-                    MarkTaskSavefileChange(task, STATE.Available);
+                    // Tasks on the same vertical layer as targetTask should be set to available
+                    if (task.State == STATE.Final)
+                    {
+                        // but if they are final RIGHT NOW, keep them final
+                        // This mimics the debug menu
+                        MarkTaskSavefileChange(task, STATE.Final);
+                    }
+                    else
+                    {
+                        MarkTaskSavefileChange(task, STATE.Available);
+                    }
                 }
                 else if (task.Parent.Any(x => x.IsMarkedForSavefileChange && x.StateSavefileChange == STATE.Available))
                 {
@@ -848,7 +928,7 @@ namespace SlyMultiTrainer
         {
             using (Graphics g = Viewer.CreateGraphics())
             {
-                var font = new Font("GenericMonospace", 12);
+                var font = new Font("Courier New", 8F);
                 var sizeF = g.MeasureString(node.LabelText, font);
                 
                 double scale = 1.0 / 1.33; // Scale pixels to points
@@ -903,11 +983,12 @@ namespace SlyMultiTrainer
             {
                 _oldTransform = Viewer.Transform;
             }
-            
+
             Graph = new();
             var settings = new SugiyamaLayoutSettings
             {
-                SnapToGridByY = SnapToGridByY.Top // Make nodes and clusters start at the same layer
+                // Make nodes and clusters start at the same layer
+                SnapToGridByY = SnapToGridByY.Top,
             };
             Graph.LayoutAlgorithmSettings = settings;
 
@@ -1021,9 +1102,9 @@ namespace SlyMultiTrainer
             return true;
         }
 
-        public Microsoft.Msagl.Drawing.Color GetClusterColorFromState(STATE nodeState)
+        public Microsoft.Msagl.Drawing.Color GetClusterColorFromState(STATE state)
         {
-            switch (nodeState)
+            switch (state)
             {
                 case STATE.Unavailable:
                     return Microsoft.Msagl.Drawing.Color.LightPink;
@@ -1038,9 +1119,9 @@ namespace SlyMultiTrainer
             }
         }
 
-        public Microsoft.Msagl.Drawing.Color GetNodeColorFromState(STATE nodeState)
+        public Microsoft.Msagl.Drawing.Color GetNodeColorFromState(STATE state)
         {
-            switch (nodeState)
+            switch (state)
             {
                 case STATE.Unavailable:
                     return Microsoft.Msagl.Drawing.Color.Red;
@@ -1108,56 +1189,172 @@ namespace SlyMultiTrainer
             // }
         }
 
-        private string ShowInputBox(string title, string textBoxLabel, string initialTextBoxValue)
+        private string? ShowSearchNodeInputBox(string title, string textBoxLabel, string initialTextBoxValue, out string cmbSelectedText)
         {
-            Form inputForm = new();
-            inputForm.Text = title;
-            inputForm.Width = 320;
-            inputForm.Height = 160;
-            inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
-            inputForm.StartPosition = FormStartPosition.CenterScreen;
-            inputForm.MinimizeBox = false;
-            inputForm.MaximizeBox = false;
-            inputForm.ShowInTaskbar = false;
-            inputForm.AcceptButton = null;
-            inputForm.CancelButton = null;
+            int topMargin = 20;
+            Form inputForm = new()
+            {
+                Text = title,
+                Width = 320,
+                Height = 160,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterScreen,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ShowInTaskbar = false,
+                AcceptButton = null,
+                CancelButton = null
+            };
 
-            System.Windows.Forms.Label textLabel = new() { Left = 10, Top = 10, Text = textBoxLabel, AutoSize = true };
-            TextBox textBox = new() { Left = 10, Top = 35, Width = 280, Text = initialTextBoxValue };
+            System.Windows.Forms.Label lblText = new()
+            {
+                Left = 10,
+                Top = 10,
+                Text = textBoxLabel,
+                AutoSize = true
+            };
 
-            Button okButton = new() { Text = "OK", Left = 140, Width = 70, Top = 70, DialogResult = DialogResult.OK };
-            Button cancelButton = new() { Text = "Cancel", Left = 220, Width = 70, Top = 70, DialogResult = DialogResult.Cancel };
+            ComboBox cmbType = new()
+            {
+                Left = lblText.Width,
+                Top = lblText.Top - 4,
+                AutoSize = true,
+                Items = { "Address", "Id" },
+                SelectedIndex = 0,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+            };
 
-            inputForm.Controls.Add(textLabel);
-            inputForm.Controls.Add(textBox);
-            inputForm.Controls.Add(okButton);
-            inputForm.Controls.Add(cancelButton);
+            TextBox txtInput = new()
+            {
+                Left = 10,
+                Top = cmbType.Top + topMargin + 10,
+                Width = 280,
+                Text = initialTextBoxValue
+            };
 
-            inputForm.AcceptButton = okButton;
-            inputForm.CancelButton = cancelButton;
+            Button btnOk = new()
+            {
+                Text = "OK",
+                Left = 140,
+                Width = 70,
+                Top = inputForm.Height - 70,
+                DialogResult = DialogResult.OK
+            };
+
+            Button btnCancel = new()
+            {
+                Text = "Cancel",
+                Left = 220,
+                Width = 70,
+                Top = inputForm.Height - 70,
+                DialogResult = DialogResult.Cancel
+            };
+
+            inputForm.Controls.Add(lblText);
+            inputForm.Controls.Add(txtInput);
+            inputForm.Controls.Add(cmbType);
+            inputForm.Controls.Add(btnOk);
+            inputForm.Controls.Add(btnCancel);
+            inputForm.AcceptButton = btnOk;
+            inputForm.CancelButton = btnCancel;
 
             DialogResult result = inputForm.ShowDialog();
-            return result == DialogResult.OK ? textBox.Text : null;
+
+            cmbSelectedText = cmbType.Text;
+            if (result != DialogResult.OK)
+            {
+                return null;
+            }
+
+            return (string?)txtInput.Text;
+        }
+
+        private string? ShowClusterSuckInputBox(string title, string textBoxLabel, string initialTextBoxValue)
+        {
+            int topMargin = 20;
+            Form inputForm = new()
+            {
+                Text = title,
+                Width = 320,
+                Height = 160,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterScreen,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ShowInTaskbar = false,
+                AcceptButton = null,
+                CancelButton = null
+            };
+
+            System.Windows.Forms.Label lblText = new()
+            {
+                Left = 10,
+                Top = 10,
+                Text = textBoxLabel,
+                AutoSize = true
+            };
+
+            TextBox txtInput = new()
+            {
+                Left = 10,
+                Top = lblText.Top + topMargin + 10,
+                Width = 280,
+                Text = initialTextBoxValue
+            };
+
+            Button btnOk = new()
+            {
+                Text = "OK",
+                Left = 140,
+                Width = 70,
+                Top = inputForm.Height - 70,
+                DialogResult = DialogResult.OK
+            };
+
+            Button btnCancel = new()
+            {
+                Text = "Cancel",
+                Left = 220,
+                Width = 70,
+                Top = inputForm.Height - 70,
+                DialogResult = DialogResult.Cancel
+            };
+
+            inputForm.Controls.Add(lblText);
+            inputForm.Controls.Add(txtInput);
+            inputForm.Controls.Add(btnOk);
+            inputForm.Controls.Add(btnCancel);
+            inputForm.AcceptButton = btnOk;
+            inputForm.CancelButton = btnCancel;
+
+            DialogResult result = inputForm.ShowDialog();
+
+            if (result != DialogResult.OK)
+            {
+                return null;
+            }
+
+            return (string?)txtInput.Text;
         }
 
         private void SaveGraphAs(string extension)
         {
-            SaveFileDialog sfd = new();
-            sfd.Filter = $"Images|*.{extension}";
-            sfd.RestoreDirectory = true;
-            if (sfd.ShowDialog() != DialogResult.OK)
-            {
-                return;
-            }
-
             if (extension == "png")
             {
+                SaveFileDialog sfd = new();
+                sfd.Filter = $"Images|*.{extension}";
+                sfd.RestoreDirectory = true;
+                if (sfd.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+
                 Bitmap image = GetImageFromGraph();
                 image.Save(sfd.FileName, System.Drawing.Imaging.ImageFormat.Png);
                 image.Dispose();
-            }
 
-            MessageBox.Show($"File saved to:\n\"{sfd.FileName}\"", "File saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"File saved to:\n\"{sfd.FileName}\"", "File saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private Bitmap GetImageFromGraph()
@@ -1169,7 +1366,7 @@ namespace SlyMultiTrainer
             return image;
         }
 
-        private void DAGViewer_MouseClick(object sender, MouseEventArgs e)
+        private void Viewer_MouseClick(object? sender, MouseEventArgs e)
         {
             if (e.Button == System.Windows.Forms.MouseButtons.Right)
             {
@@ -1204,7 +1401,7 @@ namespace SlyMultiTrainer
             }
         }
 
-        private void DAGViewer_MouseDoubleClick(object sender, MouseEventArgs e)
+        private void Viewer_MouseDoubleClick(object? sender, MouseEventArgs e)
         {
             if (e.Button == System.Windows.Forms.MouseButtons.Left)
             {
@@ -1252,78 +1449,127 @@ namespace SlyMultiTrainer
             }
         }
 
+        private void Viewer_KeyUp(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.F3)
+            {
+                HandleSearchNode();
+                return;
+            }
+
+            if (e.KeyCode == Keys.F5)
+            {
+                TriggerRefresh();
+                return;
+            }
+        }
+
         private void ShowGraphContextMenu(Point location)
         {
             var menu = new ContextMenuStrip();
 
             menu.Items.Add(new ToolStripMenuItem($"Graph ({Tasks.Count} tasks)")
             {
-                Font = new Font(SystemFonts.MenuFont, System.Drawing.FontStyle.Bold),
+                Font = _boldFont,
             });
 
             menu.Items.Add(new ToolStripSeparator());
 
             if (Tasks.Count != 0)
             {
-                menu.Items.Add(new ToolStripMenuItem("Go to root", null, (s, e) =>
-                {
-                    var rootNode = Tasks[0].MsaglNode;
-                    if (rootNode != null)
+                menu.Items.Add(new ToolStripMenuItem
+                (
+                    "Go to root",
+                    null,
+                    (s, e) =>
                     {
-                        var b = rootNode.BoundingBox;
-                        Viewer.ShowBBox(b);
+                        var rootNode = Tasks[0].MsaglNode;
+                        if (rootNode != null)
+                        {
+                            Viewer.ShowBBox(rootNode.BoundingBox);
+                        }
                     }
-                }));
+                ));
             }
 
-            menu.Items.Add(new ToolStripMenuItem("Restore pan and zoom", null, (s, e) =>
-            {
-                Viewer.Transform = null;
-                Viewer.Invalidate();
-            }));
+            menu.Items.Add(new ToolStripMenuItem
+            (
+                "Restore pan and zoom",
+                null,
+                (s, e) =>
+                {
+                    Viewer.Transform = null;
+                    Viewer.Invalidate();
+                }
+            ));
 
             var settingsMenu = new ToolStripMenuItem("Settings (requires refresh)");
 
-            settingsMenu.DropDownItems.Add(new ToolStripMenuItem("Lock pan and zoom on refresh", null, (s, e) =>
-            {
-                _lockPanAndZoomOnRefresh = !(s as ToolStripMenuItem)!.Checked;
-            })
+            settingsMenu.DropDownItems.Add(new ToolStripMenuItem
+            (
+                "Lock pan and zoom on refresh",
+                null,
+                (s, e) =>
+                {
+                    _lockPanAndZoomOnRefresh = !(s as ToolStripMenuItem)!.Checked;
+                }
+            )
             {
                 Checked = _lockPanAndZoomOnRefresh
             });
 
-            settingsMenu.DropDownItems.Add(new ToolStripMenuItem("Show name", null, (s, e) =>
-            {
-                _showName = !(s as ToolStripMenuItem)!.Checked;
-                ResizeNodesAndClustersToFitLabels();
-            })
+            settingsMenu.DropDownItems.Add(new ToolStripMenuItem
+            (
+                "Show name",
+                null,
+                (s, e) =>
+                {
+                    _showName = !(s as ToolStripMenuItem)!.Checked;
+                    ResizeNodesAndClustersToFitLabels();
+                }
+            )
             {
                 Checked = _showName
             });
 
-            settingsMenu.DropDownItems.Add(new ToolStripMenuItem("Show address", null, (s, e) =>
-            {
-                _showAddress = !(s as ToolStripMenuItem)!.Checked;
-                ResizeNodesAndClustersToFitLabels();
-            })
+            settingsMenu.DropDownItems.Add(new ToolStripMenuItem
+            (
+                "Show address",
+                null,
+                (s, e) =>
+                {
+                    _showAddress = !(s as ToolStripMenuItem)!.Checked;
+                    ResizeNodesAndClustersToFitLabels();
+                }
+            )
             {
                 Checked = _showAddress
             });
 
-            settingsMenu.DropDownItems.Add(new ToolStripMenuItem("Show id", null, (s, e) =>
-            {
-                _showId = !(s as ToolStripMenuItem)!.Checked;
-                ResizeNodesAndClustersToFitLabels();
-            })
+            settingsMenu.DropDownItems.Add(new ToolStripMenuItem
+            (
+                "Show id",
+                null,
+                (s, e) =>
+                {
+                    _showId = !(s as ToolStripMenuItem)!.Checked;
+                    ResizeNodesAndClustersToFitLabels();
+                }
+            )
             {
                 Checked = _showId
             });
 
-            settingsMenu.DropDownItems.Add(new ToolStripMenuItem("Show id as decimal", null, (s, e) =>
-            {
-                _showIdAsDecimal = !(s as ToolStripMenuItem)!.Checked;
-                ResizeNodesAndClustersToFitLabels();
-            })
+            settingsMenu.DropDownItems.Add(new ToolStripMenuItem
+            (
+                "Show id as decimal",
+                null,
+                (s, e) =>
+                {
+                    _showIdAsDecimal = !(s as ToolStripMenuItem)!.Checked;
+                    ResizeNodesAndClustersToFitLabels();
+                }
+            )
             {
                 Checked = _showIdAsDecimal
             });
@@ -1332,15 +1578,159 @@ namespace SlyMultiTrainer
 
             menu.Items.Add(new ToolStripMenuItem
             (
-                "Refresh", null, (s, e) => TriggerRefresh()
+                "Refresh",
+                Util.GetEmbeddedImage($"refresh.png"),
+                (s, e) => TriggerRefresh(),
+                Keys.F5
             ));
 
             menu.Items.Add(new ToolStripMenuItem
             (
-                "Save as png...", null, (s, e) => SaveGraphAs("png")
+                "Search node...",
+                null,
+                (s, e) => HandleSearchNode(),
+                Keys.F3
+            ));
+
+            menu.Items.Add(new ToolStripMenuItem
+            (
+                "Save as png...",
+                null,
+                (s, e) => SaveGraphAs("png")
             ));
 
             menu.Show(Viewer, location);
+        }
+
+        private void HandleSearchNode()
+        {
+            string clipboard = Clipboard.GetText();
+
+            // Cap to 8 characters to prevent freezing the textbox
+            if (clipboard.Length > 8)
+            {
+                clipboard = "";
+            }
+
+            string? input = ShowSearchNodeInputBox($"Search node", "Search node by", $"{clipboard}", out string cmbSelectedText);
+            if (input == null)
+            {
+                // cancel
+                return;
+            }
+
+            Microsoft.Msagl.Drawing.Node? nodeToFocus = null;
+            if (cmbSelectedText == "Id")
+            {
+                if (_showIdAsDecimal)
+                {
+                    // (0...)2578
+                    if (!int.TryParse(input, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int id))
+                    {
+                        MessageBox.Show($"Invalid decimal number: {input}", "Search node by id", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    nodeToFocus = GetNodeFromId(id);
+                    if (nodeToFocus is null)
+                    {
+                        MessageBox.Show($"Could not find node with id '{input}' (parsed as decimal)", "Search node by id", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+                else
+                {
+                    // (0...)A12
+                    // (0...)a12
+                    // 0x(0...)A12
+                    // 0x(0...)a12
+
+                    if (input.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    {
+                        input = input.Substring(2);
+                    }
+
+                    input = input.ToUpper();
+
+                    if (!int.TryParse(input, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out int id))
+                    {
+                        MessageBox.Show($"Invalid hexadecimal number: {input}", "Search node by id", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    nodeToFocus = GetNodeFromId(id);
+                    if (nodeToFocus is null)
+                    {
+                        MessageBox.Show($"Could not find node with id '{input}' (parsed as hexadecimal)", "Search node by id", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+            }
+            else if (cmbSelectedText == "Address")
+            {
+                // (0...)6F9CC0
+                // (0...)6f9cc0
+                // 0x(0...)6F9CC0
+                // 0x(0...)6f9cc0
+
+                if (input.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                {
+                    input = input.Substring(2);
+                }
+
+                input = input.ToUpper();
+
+                if (!int.TryParse(input, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out int res))
+                {
+                    MessageBox.Show($"Invalid hexadecimal number: {input}", "Search node by address", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                nodeToFocus = GetNodeFromAddress(res.ToString("X"));
+                if (nodeToFocus is null)
+                {
+                    MessageBox.Show($"Could not find node with address '{input}'", "Search node by address", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
+
+            Viewer.ShowBBox(nodeToFocus.BoundingBox);
+        }
+
+        private Microsoft.Msagl.Drawing.Node? GetNodeFromId(int id)
+        {
+            var task = Tasks.FirstOrDefault(x => x.Id == id);
+            if (task is not null)
+            {
+                return task.MsaglNode;
+            }
+
+            // Maybe it's a cluster
+            var cluster = Clusters.FirstOrDefault(x => x.Id == id);
+            if (cluster is not null)
+            {
+                return cluster.Subgraph;
+            }
+
+            return null;
+        }
+
+        private Microsoft.Msagl.Drawing.Node? GetNodeFromAddress(string address)
+        {
+            var task = Tasks.FirstOrDefault(x => x.Address == address);
+            if (task is not null)
+            {
+                return task.MsaglNode;
+            }
+
+            // Maybe it's a cluster
+            var cluster = Clusters.FirstOrDefault(x => x.Address == address);
+            if (cluster is not null)
+            {
+                return cluster.Subgraph;
+            }
+
+            return null;
         }
 
         private void ShowTaskContextMenu(Node graphNode, Point location)
@@ -1354,7 +1744,7 @@ namespace SlyMultiTrainer
 
             menu.Items.Add(new ToolStripMenuItem($"Task: {task.Text}")
             {
-                Font = new Font(SystemFonts.MenuFont, System.Drawing.FontStyle.Bold),
+                Font = _boldFont,
             });
 
             menu.Items.Add(new ToolStripSeparator());
@@ -1376,20 +1766,33 @@ namespace SlyMultiTrainer
 
             if (task.CheckpointEntranceValue != -1)
             {
-                menu.Items.Add(new ToolStripMenuItem
-                (
-                    "Set as current checkpoint", null, (s, e) => WriteCurrentCheckpointAddress(task)
-                ));
+                string currentCheckpointAddress = GetCurrentCheckpointAddress();
+                if (task.Address != currentCheckpointAddress)
+                {
+                    menu.Items.Add(new ToolStripMenuItem
+                    (
+                        "Set as current checkpoint",
+                        null,
+                        (s, e) => WriteCurrentCheckpointAddress(task)
+                    ));
+                }
+                else
+                {
+                    menu.Items.Add(new ToolStripMenuItem
+                    (
+                        "Unset as current checkpoint",
+                        null,
+                        (s, e) => WriteCurrentCheckpointAddress(null)
+                    ));
+                }
 
-                menu.Items.Add(new ToolStripMenuItem
-                (
-                    "Load to checkpoint", null, (s, e) => LoadCheckpoint(task, false)
-                ));
+                ToolStripMenuItem tmp = new("Load to checkpoint", null, (s, e) => LoadCheckpoint(task, false));
+                tmp.ShortcutKeyDisplayString = "Double click";
+                menu.Items.Add(tmp);
 
-                menu.Items.Add(new ToolStripMenuItem
-                (
-                    "Load to checkpoint with zero focus", null, (s, e) => LoadCheckpoint(task, true)
-                ));
+                tmp = new("Load to checkpoint with zero focus", null, (s, e) => LoadCheckpoint(task, true));
+                tmp.ShortcutKeyDisplayString = "Shift+Double click";
+                menu.Items.Add(tmp);
 
                 menu.Items.Add(new ToolStripMenuItem
                 (
@@ -1401,7 +1804,9 @@ namespace SlyMultiTrainer
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Address: {task.Address}", null, (s, e) => Clipboard.SetText(task.Address)
+                $"Address: {task.Address}",
+                null,
+                (s, e) => Clipboard.SetText(task.Address)
             ));
 
             string id = task.Id.ToString();
@@ -1412,19 +1817,25 @@ namespace SlyMultiTrainer
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Id: {id}", null, (s, e) => Clipboard.SetText(id)
+                $"Id: {id}",
+                null,
+                (s, e) => Clipboard.SetText(id)
             ));
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Name: {task.Name}", null, (s, e) => Clipboard.SetText(task.Name)
+                $"Name: {task.Name}",
+                null,
+                (s, e) => Clipboard.SetText(task.Name)
             ));
 
             if (task.GoalDescription != "")
             {
                 copyMenu.DropDownItems.Add(new ToolStripMenuItem
                 (
-                    $"Goal description: {task.GoalDescription}", null, (s, e) => Clipboard.SetText(task.GoalDescription)
+                    $"Goal description: {task.GoalDescription}",
+                    null,
+                    (s, e) => Clipboard.SetText(task.GoalDescription)
                 ));
             }
 
@@ -1432,23 +1843,31 @@ namespace SlyMultiTrainer
             {
                 copyMenu.DropDownItems.Add(new ToolStripMenuItem
                 (
-                    $"Entrance value: {task.CheckpointEntranceValue:X}", null, (s, e) => Clipboard.SetText(task.CheckpointEntranceValue.ToString("X"))
+                    $"Entrance value: {task.CheckpointEntranceValue:X}",
+                    null,
+                    (s, e) => Clipboard.SetText(task.CheckpointEntranceValue.ToString("X"))
                 ));
             }
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Focus count: {task.FocusCount}", null, (s, e) => Clipboard.SetText(task.FocusCount.ToString())
+                $"Focus count: {task.FocusCount}",
+                null,
+                (s, e) => Clipboard.SetText(task.FocusCount.ToString())
             ));
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Complete count: {task.CompleteCount}", null, (s, e) => Clipboard.SetText(task.CompleteCount.ToString())
+                $"Complete count: {task.CompleteCount}",
+                null,
+                (s, e) => Clipboard.SetText(task.CompleteCount.ToString())
             ));
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Savefile flags address: {task.SavefileFlagsAddress:X}", null, (s, e) => Clipboard.SetText($"{task.SavefileFlagsAddress:X}")
+                $"Savefile flags address: {task.SavefileFlagsAddress:X}",
+                null,
+                (s, e) => Clipboard.SetText($"{task.SavefileFlagsAddress:X}")
             ));
 
             menu.Items.Add(copyMenu);
@@ -1475,7 +1894,7 @@ namespace SlyMultiTrainer
 
             menu.Items.Add(new ToolStripMenuItem($"Job: {cluster.Text}")
             {
-                Font = new Font(SystemFonts.MenuFont, System.Drawing.FontStyle.Bold),
+                Font = _boldFont,
             });
 
             menu.Items.Add(new ToolStripSeparator());
@@ -1494,21 +1913,21 @@ namespace SlyMultiTrainer
 
             menu.Items.Add(stateMenu);
 
-            menu.Items.Add(new ToolStripMenuItem
-            (
-                "Load job", null, (s, e) => LoadCheckpoint(cluster.Tasks[0], false)
-            ));
+            ToolStripMenuItem tmp = new("Load job", null, (s, e) => LoadCheckpoint(cluster.Tasks[0], false));
+            tmp.ShortcutKeyDisplayString = "Double click";
+            menu.Items.Add(tmp);
+
+            tmp = new("Load job with zero focus", null, (s, e) => LoadCheckpoint(cluster.Tasks[0], true));
+            tmp.ShortcutKeyDisplayString = "Shift+Double click";
+            menu.Items.Add(tmp);
 
             menu.Items.Add(new ToolStripMenuItem
             (
-                "Load job with zero focus", null, (s, e) => LoadCheckpoint(cluster.Tasks[0], true)
-            ));
-
-            menu.Items.Add(new ToolStripMenuItem
-            (
-                $"Suck value: {cluster.Suck:0.0} (click to edit)", null, (s, e) =>
+                $"Suck value: {cluster.Suck:0.0} (click to edit)",
+                null,
+                (s, e) =>
                 {
-                    string input = ShowInputBox($"{cluster.Name}", "Edit suck value", $"{cluster.Suck:0.0}");
+                    string? input = ShowClusterSuckInputBox($"{cluster.Name}", "Edit suck value", $"{cluster.Suck:0.0}");
                     if (input == null)
                     {
                         // cancel
@@ -1524,7 +1943,9 @@ namespace SlyMultiTrainer
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Address: {cluster.Address}", null, (s, e) => Clipboard.SetText(cluster.Address)
+                $"Address: {cluster.Address}",
+                null,
+                (s, e) => Clipboard.SetText(cluster.Address)
             ));
 
             string id = cluster.Id.ToString();
@@ -1535,25 +1956,33 @@ namespace SlyMultiTrainer
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Id: {id}", null, (s, e) => Clipboard.SetText(id)
+                $"Id: {id}",
+                null,
+                (s, e) => Clipboard.SetText(id)
             ));
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Name: {cluster.Name}", null, (s, e) => Clipboard.SetText(cluster.Name)
+                $"Name: {cluster.Name}",
+                null,
+                (s, e) => Clipboard.SetText(cluster.Name)
             ));
 
             if (cluster.Description != "")
             {
                 copyMenu.DropDownItems.Add(new ToolStripMenuItem
                 (
-                    $"Description: {cluster.Description}", null, (s, e) => Clipboard.SetText(cluster.Description)
+                    $"Description: {cluster.Description}",
+                    null,
+                    (s, e) => Clipboard.SetText(cluster.Description)
                 ));
             }
 
             copyMenu.DropDownItems.Add(new ToolStripMenuItem
             (
-                $"Savefile flags address: {cluster.SavefileFlagsAddress:X}", null, (s, e) => Clipboard.SetText($"{cluster.SavefileFlagsAddress:X}")
+                $"Savefile flags address: {cluster.SavefileFlagsAddress:X}",
+                null,
+                (s, e) => Clipboard.SetText($"{cluster.SavefileFlagsAddress:X}")
             ));
 
             menu.Items.Add(copyMenu);
@@ -1770,9 +2199,19 @@ namespace SlyMultiTrainer
         public List<SavefileAttribute_t> Attributes;
 
         /// <summary>
-        /// The first memory address of the array of flags in the savefile region of this task
+        /// The first memory address of the array of flags in the savefile region of the task
         /// </summary>
         public int SavefileFlagsAddress;
+
+        /// <summary>
+        /// Vertical layer of the task. Theoretically, tasks with the same vertical layer are on the same horizontal line.
+        /// </summary>
+        public int VerticalLayer;
+
+        /// <summary>
+        /// Vertical layer group of the task.
+        /// </summary>
+        public int VerticalLayerGroup;
 
         public Task_t()
         {
@@ -1826,10 +2265,10 @@ namespace SlyMultiTrainer
 
     public enum DAG_VERSION
     {
-        V0 = 0, // Sly 2 ntsc e3 demo, march
-        V1 = 1, // Sly 2 retail
-        V2 = 2, // Sly 3 e3 demo
-        V3 = 3 // Sly 3 retail
+        V0 = 0, // Sly 2 NTSC E3 Demo, Sly 2 NTSC March 17
+        V1 = 1, // All other Sly 2 builds
+        V2 = 2, // Sly 3 NTSC Demo April 18
+        V3 = 3 // All other Sly 3 builds
     }
 
     [DebuggerDisplay("Id: {Id,h} SubId: {SubId,h}")]

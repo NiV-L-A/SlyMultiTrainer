@@ -1,3 +1,131 @@
+Version 1.0.3 (01/06/2026)
+    - Fixed a crash caused by accessing other processes' names while trying to detect PCSX2 and RPCS3.
+    - Added "Noclip".
+    - Added "Speed".
+    - Added the functionality to set health/lives to a specific value.
+    - The "Paste XYZ from clipboard" function of the tool strip menu now also works when the decimal separator is a comma instead of a period.
+    - Changed position, size and text of some controls.
+    - Added tabindex order.
+    - The app now closes sub forms on refresh.
+    - The first item of the "Maps" drop-down list now also updates its text with the name of the current map (e.g. "[Current map: Paris hub]").
+    - Modified text of some maps and warps.
+    - Added "Custom" warp points that the user can create, modify and delete.
+        - Accessible through the tool strip menu.
+    - Added "Entrance" warp points with format "Entrance [Id] [Address]".
+        - Read on the fly from the game's memory.
+        - The display text for each entrance location shows its id and memory address.
+        - NOTE: The app internally sorts the list by id.
+        - If "(Splice)" is at the end of the text, it indicates there's game code attached to the warp point that might modify the position or play a transition sequence.
+            - E.g. in Sly 2 NTSC Paris hub the "Entrance 189 [140E6E0] (Splice)" warp point, when triggered normally by the game, should place the characters inside the safehouse.
+    - Added "Manage..." button for gadgets and form to enable/disable specific gadgets.
+    - Gadgets are now sorted alphabetically.
+    - Added builds:
+        - Sly 1 NTSC Demo Kiosk 2-12 Spring 2004
+        - Sly 1 NTSC Demo June 14
+        - Sly 1 PAL Demo November 18
+        - Sly 1 PAL Demo PlayStation Experience
+        - Sly 1 NTSC August 23
+        - Sly 1 NTSC May 21
+        - Sly 1 PAL November 8
+        - Sly 2 PAL Demo July 27
+        - Sly 2 NTSC Demo (Ratchet & Clank: Up Your Arsenal)
+        - Sly 2 PAL Demo (Ratchet & Clank 3)
+        - Sly 2 NTSC Demo (Ratchet and Clank: Up Your Arsenal August 11)
+        - Sly 2 NTSC August 9
+        - Sly 3 PAL Demo September 2
+        - Sly 3 NTSC August 24
+        - Sly Cooper Collection (NTSC-K)
+            - The 3 games will display as "Sly 1 NTSC-K (PS3)", "Sly 2 NTSC-K (PS3)" and "Sly 3 NTSC-K (PS3)".
+    - Modified builds:
+        - "Sly 3 NTSC Regular Demo" to "Sly 3 NTSC Demo July 7".
+        - "Sly 3 NTSC E3 Demo" to "Sly 3 NTSC Demo April 18".
+        - "Sly 2 NTSC PlayStation Magazine Demo Disc 089" with serial "SCUS-97457" and CRC "B3E892E4" to "Sly 2 NTSC Official PlayStation Magazine Demo Disc 089" with serial "SCUS-97342" and CRC "7B564230".
+    - Entities:
+        - Automatically select the node of the current character on refresh.
+        - Automatically focus on the search bar on refresh.
+        - The search bar now automatically trims leading 0s when typing an address.
+            - E.g. "00FB1580" and "FB1580" ("jt" in Sly 2 NTSC in Paris hub) will return the same node.
+        - If an address is entered in the search bar it will only match if a node's address begins with the input. Before, it matched any node's address containing the input.
+        - Added a "Warps" drop-down list.
+        - Added "Speed".
+        - Fixed a bug that made the list not refresh when loading a different day of the same map in Sly 3.
+    - DAG:
+        - Improved checkpoint loading behavior to more closely match the debug menu:
+            - Jobs that are currently in the "Final" state and are in the same vertical layer as the loaded job will no longer be set to "Available" but will stay "Final".
+        - Added a "Search node..." function to the graph's context menu:
+            - Search a node (task or job) by typing its address or its id. The app will zoom in on the node if a match is found.
+            - The input textbox is filled with the current clipboard's content, but only if its length is less than 9 characters.
+            - If "Address" is chosen from the drop-down list, the input value will be parsed as hexadecimal.
+            - If "Id" is chosen from the drop-down list, the input value will be parsed:
+                - As decimal if the option "Show id as decimal" in the graph's settings is checked.
+                - As hexadecimal if the option "Show id as decimal" in the graph's settings is not checked.
+        - Added hotkeys:
+            - F3: Search node...
+            - F5: Refresh
+        - Added shortcut text for "Search node...", "Refresh", "Load to checkpoint", "Load to checkpoint with zero focus", "Load job" and "Load job with zero focus".
+        - Added "Unset as current checkpoint" for a task that is the current checkpoint.
+        - Fixed bugs in the "Set state to" function for jobs:
+            - When selecting "Unavailable", only the first task of the job had its "Focus" and "Complete" count set to 0.
+            - When selecting "Complete", only the first task of the job had its "Focus" and "Complete" count set to 1.
+            - When selecting "Final", only the first task of the job had its "Focus" and "Complete" count set to 1.
+    - Strings:
+        - Added "Monospaced font" checkbox to change the font of the textboxes to a monospaced one.
+        - Localized:
+            - Fixed not correctly parsing the new line character in Sly 2.
+        - Savefile:
+            - Fixed a bug that prevented the parsing of all fields of the savefile.
+            - Changed format to "Address - Field path".
+    - Sly 1:
+        - The "Skip current dialogue" button now also works for FMVs.
+        - World states:
+            - Fixed a bug in the "World 1" tab that made the checkboxes have the wrong value.
+            - Added "Boss defeated" checkbox.
+        - NTSC Demo:
+            - Fixed the "World states" tab not displaying the correct values.
+        - NTSC May 19:
+            - Added "World states" tab.
+            - Fixed a bug that displayed wrong warps for "A Rocky Start" and "Two to Tango".
+    - Sly 2:
+        - Added "Skip current dialogue" button.
+        - Added warps:
+            - Paris hub: "Water tower (inside)".
+        - NTSC E3 Demo:
+            - Added "Disable guards AI".
+            - Added "Undetectability".
+        - NTSC Official PlayStation Magazine Demo Disc 089:
+            - Added "Undetectability".
+        - NTSC March 17:
+            - Added "Undetectability".
+        - NTSC July 11:
+            - Added "Undetectability".
+    - Sly 3:
+        - Added "Skip current dialogue" button.
+        - Removed the "Disable death barriers" flag. Now the "Invulnerability" flag also disables death barriers.
+        - Changed the address of "Undetectability" to a better one.
+        - Changed the address of "Invulnerability" to a better one.
+        - Fixed a bug that prevented the current character from being automatically selected in the character drop-down list if it was not Sly, Bentley, or Murray.
+        - Added warps:
+            - Venice hub: "Opera house (top)".
+            - Bar: "Spawn".
+            - Hangar (team Belgium): "Spawn".
+            - Hangar (team Black Baron): "Spawn".
+            - Panda King's flashback: "Spawn".
+        - NTSC Demo April 18:
+            - Added "Undetectability".
+            - Added "Invulnerability".
+            - Renamed Sly's gadgets "Crash Disguise 1" to "Venice Disguise" and "Crash Disguise 2" to "Pope Disguise".
+            - Renamed Bentley's gadget "Unknown" to "Temporal Lock".
+        - PS3:
+            - Fixed "Toggle all gadgets" not giving the right default gadgets.
+    - Settings:
+        - Added "Skip current dialogue hotkey".
+        - Added the "None" item to the controller drop-down lists.
+        - Added "Automatically select the current character on "Entities" list refresh".
+        - Added "Order and visibility of warps".
+        - Added confirmation when closing the form.
+    - About:
+        - The addresses are now sorted in alphabetical order.
+
 Version 1.0.2 (19/01/2026)
     - Added a process selector.
     - Changed .sln file to .slnx.
@@ -10,7 +138,7 @@ Version 1.0.2 (19/01/2026)
             - The 3 games will display as "Sly 1 UK (PS3)", "Sly 2 UK (PS3)" and "Sly 3 UK (PS3)".
         - Sly Cooper Collection (NTSC-J)
             - The 3 games will display as "Sly 1 NTSC-J (PS3)", "Sly 2 NTSC-J (PS3)" and "Sly 3 NTSC-J (PS3)".
-    - Added "Strings" tab for Sly 2 & 2:
+    - Added "Strings" tab for Sly 2 & 3:
         - A tab that contains 2 sub-tabs:
             - "Localized" tab:
                 - Populated on map change.

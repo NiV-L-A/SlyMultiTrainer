@@ -11,5 +11,14 @@
     <Setting Name="FlyButtonAccelerate" Type="System.String" Scope="User">
       <Value Profile="(Default)">L1</Value>
     </Setting>
+    <Setting Name="EntitiesSelectActChar" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="WarpsList" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Built-in;true|Custom;true|Entrance;true</Value>
+    </Setting>
+    <Setting Name="SkipCurrentDialogueBind" Type="System.String" Scope="User">
+      <Value Profile="(Default)">L1</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

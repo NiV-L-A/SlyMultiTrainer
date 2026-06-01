@@ -28,11 +28,11 @@
         /// </summary>
         private void InitializeComponent()
         {
-            btnOK = new Button();
+            btnSave = new Button();
             btnCancel = new Button();
             cmbFlyUp = new ComboBox();
             label1 = new Label();
-            grpClock = new GroupBox();
+            grpSettingsFly = new GroupBox();
             label3 = new Label();
             cmbFlyAccelerate = new ComboBox();
             label2 = new Label();
@@ -40,29 +40,39 @@
             btnResetSettings = new Button();
             tabControl1 = new TabControl();
             tabSettingsMain = new TabPage();
-            grpClock.SuspendLayout();
+            label4 = new Label();
+            cmbSkipCurrentDialogueHotkey = new ComboBox();
+            grpSettingsEntities = new GroupBox();
+            chkEntitiesSelectActChar = new CheckBox();
+            grpSettingsWarps = new GroupBox();
+            clbWarpsOrder = new CheckedListBox();
+            btnWarpsOrderMoveDown = new Button();
+            btnWarpsOrderMoveUp = new Button();
+            grpSettingsFly.SuspendLayout();
             tabControl1.SuspendLayout();
             tabSettingsMain.SuspendLayout();
+            grpSettingsEntities.SuspendLayout();
+            grpSettingsWarps.SuspendLayout();
             SuspendLayout();
             // 
-            // btnOK
+            // btnSave
             // 
-            btnOK.AutoSize = true;
-            btnOK.Location = new Point(477, 316);
-            btnOK.Name = "btnOK";
-            btnOK.Size = new Size(75, 25);
-            btnOK.TabIndex = 0;
-            btnOK.Text = "OK";
-            btnOK.UseVisualStyleBackColor = true;
-            btnOK.Click += btnOK_Click;
+            btnSave.AutoSize = true;
+            btnSave.Location = new Point(455, 316);
+            btnSave.Name = "btnSave";
+            btnSave.Size = new Size(97, 25);
+            btnSave.TabIndex = 2;
+            btnSave.Text = "Save and exit";
+            btnSave.UseVisualStyleBackColor = true;
+            btnSave.Click += btnSave_Click;
             // 
-            // btnCancel
+            // btnClose
             // 
             btnCancel.AutoSize = true;
             btnCancel.Location = new Point(558, 316);
-            btnCancel.Name = "btnCancel";
+            btnCancel.Name = "btnClose";
             btnCancel.Size = new Size(75, 25);
-            btnCancel.TabIndex = 1;
+            btnCancel.TabIndex = 3;
             btnCancel.Text = "Cancel";
             btnCancel.UseVisualStyleBackColor = true;
             btnCancel.Click += btnCancel_Click;
@@ -73,7 +83,7 @@
             cmbFlyUp.Location = new Point(74, 25);
             cmbFlyUp.Name = "cmbFlyUp";
             cmbFlyUp.Size = new Size(86, 21);
-            cmbFlyUp.TabIndex = 36;
+            cmbFlyUp.TabIndex = 0;
             // 
             // label1
             // 
@@ -84,21 +94,21 @@
             label1.TabIndex = 37;
             label1.Text = "Up";
             // 
-            // grpClock
+            // grpSettingsFly
             // 
-            grpClock.BackColor = Color.Transparent;
-            grpClock.Controls.Add(label3);
-            grpClock.Controls.Add(cmbFlyAccelerate);
-            grpClock.Controls.Add(label2);
-            grpClock.Controls.Add(cmbFlyDown);
-            grpClock.Controls.Add(label1);
-            grpClock.Controls.Add(cmbFlyUp);
-            grpClock.Location = new Point(6, 6);
-            grpClock.Name = "grpClock";
-            grpClock.Size = new Size(169, 118);
-            grpClock.TabIndex = 38;
-            grpClock.TabStop = false;
-            grpClock.Text = "Fly";
+            grpSettingsFly.BackColor = Color.Transparent;
+            grpSettingsFly.Controls.Add(label3);
+            grpSettingsFly.Controls.Add(cmbFlyAccelerate);
+            grpSettingsFly.Controls.Add(label2);
+            grpSettingsFly.Controls.Add(cmbFlyDown);
+            grpSettingsFly.Controls.Add(label1);
+            grpSettingsFly.Controls.Add(cmbFlyUp);
+            grpSettingsFly.Location = new Point(6, 6);
+            grpSettingsFly.Name = "grpSettingsFly";
+            grpSettingsFly.Size = new Size(169, 118);
+            grpSettingsFly.TabIndex = 0;
+            grpSettingsFly.TabStop = false;
+            grpSettingsFly.Text = "Fly controller binds";
             // 
             // label3
             // 
@@ -115,7 +125,7 @@
             cmbFlyAccelerate.Location = new Point(74, 83);
             cmbFlyAccelerate.Name = "cmbFlyAccelerate";
             cmbFlyAccelerate.Size = new Size(86, 21);
-            cmbFlyAccelerate.TabIndex = 40;
+            cmbFlyAccelerate.TabIndex = 2;
             // 
             // label2
             // 
@@ -132,7 +142,7 @@
             cmbFlyDown.Location = new Point(74, 54);
             cmbFlyDown.Name = "cmbFlyDown";
             cmbFlyDown.Size = new Size(86, 21);
-            cmbFlyDown.TabIndex = 38;
+            cmbFlyDown.TabIndex = 1;
             // 
             // btnResetSettings
             // 
@@ -144,7 +154,7 @@
             btnResetSettings.Location = new Point(12, 316);
             btnResetSettings.Name = "btnResetSettings";
             btnResetSettings.Size = new Size(89, 25);
-            btnResetSettings.TabIndex = 39;
+            btnResetSettings.TabIndex = 1;
             btnResetSettings.Text = "Reset settings";
             btnResetSettings.UseVisualStyleBackColor = true;
             btnResetSettings.Click += btnResetSettings_Click;
@@ -156,11 +166,15 @@
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
             tabControl1.Size = new Size(645, 310);
-            tabControl1.TabIndex = 44;
+            tabControl1.TabIndex = 0;
             // 
             // tabSettingsMain
             // 
-            tabSettingsMain.Controls.Add(grpClock);
+            tabSettingsMain.Controls.Add(label4);
+            tabSettingsMain.Controls.Add(cmbSkipCurrentDialogueHotkey);
+            tabSettingsMain.Controls.Add(grpSettingsEntities);
+            tabSettingsMain.Controls.Add(grpSettingsWarps);
+            tabSettingsMain.Controls.Add(grpSettingsFly);
             tabSettingsMain.Location = new Point(4, 22);
             tabSettingsMain.Name = "tabSettingsMain";
             tabSettingsMain.Padding = new Padding(3);
@@ -168,6 +182,89 @@
             tabSettingsMain.TabIndex = 0;
             tabSettingsMain.Text = "Main";
             tabSettingsMain.UseVisualStyleBackColor = true;
+            // 
+            // label4
+            // 
+            label4.AutoSize = true;
+            label4.Location = new Point(12, 189);
+            label4.Name = "label4";
+            label4.Size = new Size(142, 13);
+            label4.TabIndex = 39;
+            label4.Text = "Skip current dialogue hotkey";
+            // 
+            // cmbSkipCurrentDialogueHotkey
+            // 
+            cmbSkipCurrentDialogueHotkey.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbSkipCurrentDialogueHotkey.Location = new Point(160, 186);
+            cmbSkipCurrentDialogueHotkey.Name = "cmbSkipCurrentDialogueHotkey";
+            cmbSkipCurrentDialogueHotkey.Size = new Size(86, 21);
+            cmbSkipCurrentDialogueHotkey.TabIndex = 38;
+            // 
+            // grpSettingsEntities
+            // 
+            grpSettingsEntities.BackColor = Color.Transparent;
+            grpSettingsEntities.Controls.Add(chkEntitiesSelectActChar);
+            grpSettingsEntities.Location = new Point(6, 130);
+            grpSettingsEntities.Name = "grpSettingsEntities";
+            grpSettingsEntities.Size = new Size(360, 50);
+            grpSettingsEntities.TabIndex = 2;
+            grpSettingsEntities.TabStop = false;
+            grpSettingsEntities.Text = "Entities";
+            // 
+            // chkEntitiesSelectActChar
+            // 
+            chkEntitiesSelectActChar.AutoSize = true;
+            chkEntitiesSelectActChar.Location = new Point(6, 19);
+            chkEntitiesSelectActChar.Name = "chkEntitiesSelectActChar";
+            chkEntitiesSelectActChar.Size = new Size(333, 17);
+            chkEntitiesSelectActChar.TabIndex = 0;
+            chkEntitiesSelectActChar.Text = "Automatically select the current character on list refresh";
+            chkEntitiesSelectActChar.UseVisualStyleBackColor = true;
+            // 
+            // grpSettingsWarps
+            // 
+            grpSettingsWarps.BackColor = Color.Transparent;
+            grpSettingsWarps.Controls.Add(clbWarpsOrder);
+            grpSettingsWarps.Controls.Add(btnWarpsOrderMoveDown);
+            grpSettingsWarps.Controls.Add(btnWarpsOrderMoveUp);
+            grpSettingsWarps.Location = new Point(181, 6);
+            grpSettingsWarps.Name = "grpSettingsWarps";
+            grpSettingsWarps.Size = new Size(185, 118);
+            grpSettingsWarps.TabIndex = 1;
+            grpSettingsWarps.TabStop = false;
+            grpSettingsWarps.Text = "Order and visibility of warps";
+            // 
+            // clbWarpsOrder
+            // 
+            clbWarpsOrder.FormattingEnabled = true;
+            clbWarpsOrder.Items.AddRange(new object[] { "Built-in", "Custom", "Entrance" });
+            clbWarpsOrder.Location = new Point(6, 19);
+            clbWarpsOrder.Name = "clbWarpsOrder";
+            clbWarpsOrder.Size = new Size(133, 94);
+            clbWarpsOrder.TabIndex = 0;
+            clbWarpsOrder.SelectedIndexChanged += clbWarpsOrder_SelectedIndexChanged;
+            // 
+            // btnWarpsOrderMoveDown
+            // 
+            btnWarpsOrderMoveDown.Font = new Font("Microsoft Sans Serif", 13F);
+            btnWarpsOrderMoveDown.Location = new Point(145, 54);
+            btnWarpsOrderMoveDown.Name = "btnWarpsOrderMoveDown";
+            btnWarpsOrderMoveDown.Size = new Size(30, 30);
+            btnWarpsOrderMoveDown.TabIndex = 2;
+            btnWarpsOrderMoveDown.Text = "▼";
+            btnWarpsOrderMoveDown.UseVisualStyleBackColor = true;
+            btnWarpsOrderMoveDown.Click += btnWarpsOrderMoveDown_Click;
+            // 
+            // btnWarpsOrderMoveUp
+            // 
+            btnWarpsOrderMoveUp.Font = new Font("Microsoft Sans Serif", 13F);
+            btnWarpsOrderMoveUp.Location = new Point(145, 18);
+            btnWarpsOrderMoveUp.Name = "btnWarpsOrderMoveUp";
+            btnWarpsOrderMoveUp.Size = new Size(30, 30);
+            btnWarpsOrderMoveUp.TabIndex = 1;
+            btnWarpsOrderMoveUp.Text = "▲";
+            btnWarpsOrderMoveUp.UseVisualStyleBackColor = true;
+            btnWarpsOrderMoveUp.Click += btnWarpsOrderMoveUp_Click;
             // 
             // FormSettings
             // 
@@ -178,7 +275,7 @@
             Controls.Add(tabControl1);
             Controls.Add(btnResetSettings);
             Controls.Add(btnCancel);
-            Controls.Add(btnOK);
+            Controls.Add(btnSave);
             Font = new Font("Microsoft Sans Serif", 8F);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
@@ -188,21 +285,25 @@
             Text = "Sly Multi Trainer - Settings";
             FormClosing += FormSettings_FormClosing;
             Load += FormSettings_Load;
-            grpClock.ResumeLayout(false);
-            grpClock.PerformLayout();
+            grpSettingsFly.ResumeLayout(false);
+            grpSettingsFly.PerformLayout();
             tabControl1.ResumeLayout(false);
             tabSettingsMain.ResumeLayout(false);
+            tabSettingsMain.PerformLayout();
+            grpSettingsEntities.ResumeLayout(false);
+            grpSettingsEntities.PerformLayout();
+            grpSettingsWarps.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
 
         #endregion
 
-        private Button btnOK;
+        private Button btnSave;
         private Button btnCancel;
         public ComboBox cmbFlyUp;
         private Label label1;
-        private GroupBox grpClock;
+        private GroupBox grpSettingsFly;
         private Label label3;
         public ComboBox cmbFlyAccelerate;
         private Label label2;
@@ -210,5 +311,13 @@
         public Button btnResetSettings;
         private TabControl tabControl1;
         private TabPage tabSettingsMain;
+        private CheckBox chkEntitiesSelectActChar;
+        private CheckedListBox clbWarpsOrder;
+        private Button btnWarpsOrderMoveDown;
+        private Button btnWarpsOrderMoveUp;
+        private GroupBox grpSettingsEntities;
+        private GroupBox grpSettingsWarps;
+        private Label label4;
+        public ComboBox cmbSkipCurrentDialogueHotkey;
     }
 }
